@@ -22,7 +22,7 @@ AliDice 是一个桌面骰子应用（Python 3.9+ / Tkinter / 纯标准库），
 
 ```bash
 python app.py                  # 启动界面
-python selftest.py             # 自测，必须 84/84 通过
+python selftest.py             # 自测，必须 91/91 通过
 python verify.py               # 只读校验 data/history.dat
 python verify.py --file data/history-20260510-120000.dat
 python -m pyflakes *.py
@@ -83,12 +83,15 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
    `README.md` 的格式表，并让旧文件“可读或明确拒绝”。不得静默改变布局。
 4. **每条记录必须**含连续 `index`、`prev_tag`、`tag = HMAC(key, "REC" | file_id |
    记录头 | payload)`，且 payload 内 `total == sum(rolls) + modifier`（读取时校验）。
-5. **seal 必须双写**：`seals/<file_id>.seal`（用于归档文件独立校验）与 `seal.bin`
+5. **记录里的 `total` 是有符号 i64**（`REC_TAIL_FMT = "<Iiq"`）：固定修正值可以大于
+   骰面，合计允许为负（如 `1D100-50`）。不要改回无符号 `Q`；非负数值的编码字节与
+   旧格式一致，改动后必须跑“负值合计”用例。
+6. **seal 必须双写**：`seals/<file_id>.seal`（用于归档文件独立校验）与 `seal.bin`
    （当前链锚，用于发现数据文件被整体删除）。缺一不可。
-6. **密钥不得进入 `data/`，不得提交到仓库**；密钥派生必须包含机器指纹。
-7. **校验失败必须锁定**：界面禁止掷骰，只能提示归档重置。不要提供“强制忽略校验”
+7. **密钥不得进入 `data/`，不得提交到仓库**；密钥派生必须包含机器指纹。
+8. **校验失败必须锁定**：界面禁止掷骰，只能提示归档重置。不要提供“强制忽略校验”
    之类的开关。
-8. **界面不得提供编辑/删除历史的能力**，包括右键菜单、快捷键、隐藏按钮。
+9. **界面不得提供编辑/删除历史的能力**，包括右键菜单、快捷键、隐藏按钮。
 
 ## 已知平台陷阱（改代码前必读）
 
@@ -117,6 +120,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
   （拆骰、修正值、未校验、分箱、占比之和）。
 - 改 `dice.py` 的判定阈值：`selftest.py` 的“大成功判定”用例必须覆盖 1D100 的
   95/96、5/6 边界，以及 1D20、1D10、1D6、1D1000 的比例边界。
+- 改历史二进制字段：必须保持 `total` 的有符号性并跑“负值合计”用例（写入、重开、
+  复制格式、统计）；不要新增会拒绝负合计的校验。
 - 改 `stats_view.py`：确认柱状图/饼图在 900×600 到 1100×720 下都不裁切图例，
   悬停提示与分布表数值一致；亮/暗两套主题下图表都清晰可读；缩略模式展示**全部**
   已校验历史记录（不随当前骰子过滤）。

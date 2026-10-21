@@ -415,7 +415,7 @@ class DiceApp(tk.Tk):
             "time": measure("88:88:88") + 16,
             "expr": measure("88D888+88D8") + 14,
             "rolls": 120,
-            "total": measure("8888") + 12,
+            "total": measure("-8888") + 12,
         }
         self._col_widths = {k: widths[k] for k in ("idx", "time", "expr", "total")}
         anchors = {"idx": "w", "time": "w", "expr": "w", "rolls": "w", "total": "e"}

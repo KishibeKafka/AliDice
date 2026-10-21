@@ -64,7 +64,9 @@ REC_MAGIC = b"REC\x00"
 REC_VERSION = 1
 REC_HEADER_FMT = "<4sIIQH10s32s"
 REC_HEADER_SIZE = struct.calcsize(REC_HEADER_FMT)  # 64
-REC_TAIL_FMT = "<IiQ"
+# total 使用有符号 64 位：允许 1D100-50 这类负合计。旧文件里 total 均 >= 0，
+# 补码表示与非负数值的 Q 编码逐字节一致，因此无需升级文件版本。
+REC_TAIL_FMT = "<Iiq"
 REC_TAIL_SIZE = struct.calcsize(REC_TAIL_FMT)  # 16
 
 TAG_SIZE = 32

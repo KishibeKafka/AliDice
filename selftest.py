@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """核心逻辑自检：``python selftest.py``。
 
-覆盖：表达式解析、复制格式、大成功判定、追加入库、重开校验、各种篡改检测、归档重置、
+覆盖：表达式解析、复制格式、大成功判定、负值合计、追加入库、重开校验、各种篡改检测、归档重置、
 归档文件读取、统计聚合、主题。
 """
 
@@ -103,6 +103,38 @@ def copy_format_tests() -> None:
         == f"[{' + '.join(str(v) for v in roll.rolls)} = {roll.total}]".replace(
             "[", "[3D10 = ", 1
         ),
+    )
+
+
+def negative_total_tests(root: str) -> None:
+    section("负值合计")
+
+    sub = os.path.join(root, "neg")
+    store = make_store(sub)
+    store.open()
+    rec = store.append("1D100-50", [3], -50)
+    check("负合计写入", rec.total == -47, rec.total)
+    rec2 = store.append("2D6-20", [2, 1], -20)
+    check("负合计多骰", rec2.total == -17, rec2.total)
+    store.close()
+
+    store2 = make_store(sub)
+    rep = store2.open()
+    check("负合计重开校验", rep.state == history.STATE_OK, rep.message)
+    check("负合计读回", [r.total for r in store2.records] == [-47, -17])
+    store2.close()
+
+    check(
+        "负合计复制格式",
+        dice.bracket_text("1D100-50", [3], -50) == "[1D100-50 = 3 - 50 = -47]",
+    )
+    st = stats.collect(
+        [history.Record(0, 0, "1D100-50", (3,), -50, -47, b"", True)], 100
+    )
+    check("统计忽略修正值", st.total == 1 and st.counts[2] == 1)
+    check(
+        "非负合计编码与旧格式一致",
+        struct.pack("<q", 87) == struct.pack("<Q", 87),
     )
 
 
@@ -466,6 +498,7 @@ def main() -> int:
         expr_tests()
         copy_format_tests()
         crit_tests()
+        negative_total_tests(root)
         basic_flow(root)
         tamper_tests(root)
         reset_tests(root)

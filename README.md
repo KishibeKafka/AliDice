@@ -6,7 +6,7 @@
 
 ```
 python app.py          # 或双击 run.bat（无控制台窗口）
-python selftest.py     # 核心逻辑 + 篡改检测 + 统计聚合自测（84 项）
+python selftest.py     # 核心逻辑 + 篡改检测 + 统计聚合自测（91 项）
 python verify.py       # 只读校验历史完整性
 ```
 
@@ -39,6 +39,9 @@ xDx            投 x 个 y 面骰（x 省略时为 1）
 xDx + k        带固定修正值
 xDx + aDb - k  多个骰子组相加
 ```
+
+固定修正值可以大于骰面，合计允许为负（例如 `1D100-50` 掷出 3 记作 -47），
+历史与复制都会原样记录。
 
 限制：单个骰子组 ≤ 1000 颗、总骰子数 ≤ 1000、面数 ≤ 1,000,000、最多 32 组。
 骰子组本身不能取负（负号用于固定修正值），例如 `3D6-2` 合法，`-2D6` 不合法。
@@ -106,7 +109,7 @@ xDx + aDb - k  多个骰子组相加
                version(2) reserved(10) prev_tag(32)
 tag         : HMAC(密钥, "REC" | file_id | 记录头 | payload)
 payload     : notation_len(1) notation(utf-8) roll_count(4) modifier(4)
-              total(8) rolls(i32 × roll_count)
+              total(i64) rolls(i32 × roll_count)
 seal    96 B : magic "ALIDSEAL"(8) version(2) reserved(2) count(4)
                file_id(16) head_tag(32) mac(32)
 ```

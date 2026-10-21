@@ -162,7 +162,7 @@ class ArchiveWindow(tk.Toplevel):
             "idx": measure("#888") + 10,
             "time": measure("88:88:88") + 16,
             "expr": measure("88D888+88D8") + 14,
-            "total": measure("88888") + 12,
+            "total": measure("-88888") + 12,
         }
         self.tree = ttk.Treeview(
             wrap, columns=cols, show="headings", style="Archive.Treeview", selectmode="browse"
