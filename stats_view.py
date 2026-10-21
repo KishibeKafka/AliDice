@@ -345,8 +345,8 @@ class StatsWindow(tk.Toplevel):
         self._sync_view_chips()
 
     def _fill_chips(self) -> None:
-        st = self.stats
-        records = list(reversed(st.matched)) if st is not None else []
+        # 缩略模式展示全部已校验历史记录，不按当前选中的骰子过滤
+        records = [rec for rec in reversed(self.store.records) if rec.verified]
         total = len(records)
         truncated = total > CHIP_LIMIT
         if truncated:
@@ -359,7 +359,7 @@ class StatsWindow(tk.Toplevel):
             for rec in records
         ]
         self.chips.set_items(items)
-        info = f"{total} 条记录"
+        info = f"{total} 条记录 · 全部骰子"
         if truncated:
             info += f" · 显示最近 {CHIP_LIMIT} 条"
         self.table_info.configure(text=info)

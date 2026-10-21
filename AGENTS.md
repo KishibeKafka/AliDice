@@ -64,7 +64,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 归档查看窗口通过 `HistoryStore.for_file(path)`（`read_only=True`）打开任意
   `history-*.dat`，只展示记录并校验，绝不写文件；主窗口负责在换肤时通知它。
 - 统计/归档窗口各有「表格 / 缩略」视图：缩略模式用 `chipgrid.ChipGrid`，记录文本统一
-  由 `dice.result_text()` 生成（`1D10 = 8`、`2D100 = 33 + 66 = 99`），不要另拼格式。
+  由 `dice.result_text()` 生成（`1D10 = 8`、`2D100 = 33 + 66 = 99`），不要另拼格式；
+  统计窗口的缩略列表展示全部已校验记录，不要按当前骰子筛选。
 - 大成功/大失败判定只允许在 `dice.crit_kind()` 里：1D100 为 96–100 / 1–5，其它骰子按
   ≥95% / ≤5% 面数比例；界面只在 `app.py` 用 `C.crit_ok` / `C.crit_bad` 着色，
   多颗骰只标记逐颗点数，合计保持金色。
@@ -117,8 +118,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 改 `dice.py` 的判定阈值：`selftest.py` 的“大成功判定”用例必须覆盖 1D100 的
   95/96、5/6 边界，以及 1D20、1D10、1D6、1D1000 的比例边界。
 - 改 `stats_view.py`：确认柱状图/饼图在 900×600 到 1100×720 下都不裁切图例，
-  悬停提示与分布表数值一致；亮/暗两套主题下图表都清晰可读；缩略模式的记录块
-  与当前骰子筛选一致（`DieStats.matched`）。
+  悬停提示与分布表数值一致；亮/暗两套主题下图表都清晰可读；缩略模式展示**全部**
+  已校验历史记录（不随当前骰子过滤）。
 - 改 `chipgrid.py`：确认缩略标签在 300–1000px 宽度内都能自动换行、不溢出，
   滚轮可用，换肤后 Canvas 与滚动条颜色都会更新。
 - 改 `theme.py`：`selftest.py` 的“主题”用例必须通过（角色唯一、换肤往返一致），
