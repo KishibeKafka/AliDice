@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """核心逻辑自检：``python selftest.py``。
 
-覆盖：表达式解析、复制格式、追加入库、重开校验、各种篡改检测、归档重置、统计聚合。
+覆盖：表达式解析、复制格式、追加入库、重开校验、各种篡改检测、归档重置、统计聚合、主题。
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import tempfile
 import dice
 import history
 import stats
+import theme
 
 
 PASS = 0
@@ -356,6 +357,39 @@ def stats_tests() -> None:
     check("最常见/最少见点数", hot.hottest.face == 6 and hot.coldest.face == 1)
 
 
+def theme_tests() -> None:
+    section("主题")
+
+    from dataclasses import fields as dc_fields
+
+    for name, palette in theme.PALETTES.items():
+        seen = {}
+        duplicates = []
+        for f in dc_fields(theme.Palette):
+            if f.name in ("name", "label", "series"):
+                continue
+            value = getattr(palette, f.name).lower()
+            if value in seen:
+                duplicates.append(f"{f.name} 与 {seen[value]}")
+            seen[value] = f.name
+        check(f"{name} 配色角色不重复", not duplicates, ", ".join(duplicates))
+
+    def snapshot():
+        return {
+            f.name: getattr(theme.C, f.name)
+            for f in dc_fields(theme.Palette)
+            if f.name not in ("name", "label", "series")
+        }
+
+    original = theme.current()
+    before = snapshot()
+    mapping = theme.switch("light" if original == "dark" else "dark")
+    check("换肤返回颜色映射", bool(mapping))
+    check("切换后当前主题", theme.current() != original)
+    theme.switch(original)
+    check("换肤往返一致", snapshot() == before)
+
+
 def main() -> int:
     root = tempfile.mkdtemp(prefix="alidice-selftest-")
     try:
@@ -366,6 +400,7 @@ def main() -> int:
         reset_tests(root)
         crash_safety_tests(root)
         stats_tests()
+        theme_tests()
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"\n结果：{PASS} 通过 / {FAIL} 失败")

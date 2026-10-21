@@ -20,24 +20,7 @@ from typing import List, Optional, Tuple
 import dice
 import history as hist
 import theme
-from theme import (
-    ACCENT,
-    ACCENT_HOVER,
-    BG,
-    BLUE,
-    BORDER,
-    CARD,
-    CARD_ALT,
-    DANGER,
-    DANGER_BG,
-    DIM,
-    FG,
-    FIELD,
-    GOLD,
-    MUTED,
-    OK_BG,
-    WARN_BG,
-)
+from theme import C
 
 CONFIG_PATH = os.path.join(hist.project_dir(), "config.json")
 DEFAULT_PRESETS = ("1D100", "1D10")
@@ -51,20 +34,39 @@ ICON_B64 = (
 # ---------------------------------------------------------------- 配置
 
 
-def load_presets() -> List[str]:
-    presets: List[str] = []
+def _read_config() -> dict:
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
             raw = json.load(fh)
-        for item in raw.get("presets", []):
+        if isinstance(raw, dict):
+            return raw
+    except (OSError, ValueError):
+        pass
+    return {}
+
+
+def write_config(**updates) -> None:
+    config = _read_config()
+    config.update(updates)
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
+            json.dump(config, fh, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+def load_presets() -> List[str]:
+    presets: List[str] = []
+    raw = _read_config()
+    items = raw.get("presets")
+    if isinstance(items, list):
+        for item in items:
             if not isinstance(item, str):
                 continue
             try:
                 presets.append(dice.parse(item).text)
             except dice.DiceError:
                 continue
-    except (OSError, ValueError, AttributeError):
-        pass
     if not presets:
         presets = list(DEFAULT_PRESETS)
     # 去重保序
@@ -73,11 +75,16 @@ def load_presets() -> List[str]:
 
 
 def save_presets(presets: List[str]) -> None:
-    try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as fh:
-            json.dump({"presets": presets}, fh, ensure_ascii=False, indent=2)
-    except OSError:
-        pass
+    write_config(presets=presets)
+
+
+def load_theme_name() -> str:
+    name = _read_config().get("theme")
+    return name if name in theme.PALETTES else theme.DEFAULT_THEME
+
+
+def save_theme(name: str) -> None:
+    write_config(theme=name)
 
 
 # ---------------------------------------------------------------- 主窗口
@@ -98,7 +105,7 @@ class DiceApp(tk.Tk):
         self._stats_win = None
 
         self.title("AliDice · 骰子")
-        self.configure(bg=BG)
+        self.configure(bg=C.bg)
         try:
             self._icon_image = tk.PhotoImage(data=ICON_B64)
             self.iconphoto(True, self._icon_image)
@@ -113,7 +120,7 @@ class DiceApp(tk.Tk):
         self._update_footer()
         if not self.store.report.can_append:
             self.hint_label.configure(
-                text="历史校验未通过，掷骰已锁定 · 可点底部「归档并重置」", fg=DANGER
+                text="历史校验未通过，掷骰已锁定 · 可点底部「归档并重置」", fg=C.danger
             )
 
         self.minsize(920, 620)
@@ -159,44 +166,44 @@ class DiceApp(tk.Tk):
         )
         style.configure(
             "Ali.Treeview",
-            background=CARD,
-            fieldbackground=CARD,
-            foreground=FG,
+            background=C.card,
+            fieldbackground=C.card,
+            foreground=C.fg,
             borderwidth=0,
             rowheight=28,
             font=self.f_small,
         )
         style.configure(
             "Ali.Treeview.Heading",
-            background=CARD_ALT,
-            foreground=MUTED,
+            background=C.card_alt,
+            foreground=C.muted,
             borderwidth=0,
             relief="flat",
             font=self.f_tiny,
         )
         style.map(
             "Ali.Treeview",
-            background=[("selected", "#2c3a55")],
-            foreground=[("selected", "#ffffff")],
+            background=[("selected", C.selected)],
+            foreground=[("selected", C.selected_fg)],
         )
-        style.map("Ali.Treeview.Heading", background=[("active", CARD_ALT)])
+        style.map("Ali.Treeview.Heading", background=[("active", C.card_alt)])
         style.configure(
             "Ali.Vertical.TScrollbar",
-            background=CARD_ALT,
-            troughcolor=BG,
-            bordercolor=BG,
-            arrowcolor=MUTED,
+            background=C.card_alt,
+            troughcolor=C.bg,
+            bordercolor=C.bg,
+            arrowcolor=C.muted,
             relief="flat",
             width=10,
         )
-        style.map("Ali.Vertical.TScrollbar", background=[("active", BORDER)])
+        style.map("Ali.Vertical.TScrollbar", background=[("active", C.border)])
 
     def _button(self, parent, text, command, kind="ghost", font=None, padx=14, pady=7):
         spec = {
-            "accent": (ACCENT, "#05160f", ACCENT_HOVER),
-            "ghost": (CARD_ALT, FG, "#2b3446"),
-            "chip": (FIELD, BLUE, "#2b3446"),
-            "danger": (DANGER_BG, DANGER, "#4b262e"),
+            "accent": (C.accent, C.accent_text, C.accent_hover),
+            "ghost": (C.card_alt, C.fg, C.hover),
+            "chip": (C.field, C.blue, C.hover),
+            "danger": (C.danger_bg, C.danger, C.hover),
         }[kind]
         btn = tk.Button(
             parent,
@@ -218,40 +225,85 @@ class DiceApp(tk.Tk):
         btn.bind("<Leave>", lambda e: btn.configure(bg=spec[0]) if str(btn["state"]) == "normal" else None)
         return btn
 
+    def _sync_theme_chips(self) -> None:
+        active = theme.current()
+        for name, chip in self.theme_chips.items():
+            if name == active:
+                chip.configure(bg=C.selected, fg=C.fg)
+            else:
+                chip.configure(bg=C.card_alt, fg=C.muted)
+
+    def _apply_theme(self, name: str) -> None:
+        mapping = theme.switch(name)
+        theme.apply_to_widgets(self, mapping)
+        self._setup_style()
+        self._sync_theme_chips()
+        self._update_badge()
+        self._update_footer()
+        self._render_presets()
+        self._apply_tree_tags()
+        self._set_chips(self._last[0] if self._last else None)
+        win = self._stats_win
+        if win is not None:
+            try:
+                if win.winfo_exists():
+                    win.apply_theme(mapping)
+                else:
+                    self._stats_win = None
+            except tk.TclError:
+                self._stats_win = None
+        save_theme(name)
+
+    def _apply_tree_tags(self) -> None:
+        self.tree.tag_configure("odd", background=C.card)
+        self.tree.tag_configure("even", background=C.row_alt)
+        self.tree.tag_configure("bad", foreground=C.danger)
+
     def _card(self, master) -> tk.Frame:
         return tk.Frame(
             master,
-            bg=CARD,
+            bg=C.card,
             highlightthickness=1,
-            highlightbackground=BORDER,
-            highlightcolor=BORDER,
+            highlightbackground=C.border,
+            highlightcolor=C.border,
         )
 
     # ------------------------------------------------------------ 布局
 
     def _build_ui(self) -> None:
-        root = tk.Frame(self, bg=BG)
+        root = tk.Frame(self, bg=C.bg)
         root.pack(fill="both", expand=True, padx=22, pady=(16, 12))
 
-        header = tk.Frame(root, bg=BG)
+        header = tk.Frame(root, bg=C.bg)
         header.pack(fill="x")
-        tk.Label(header, text="AliDice", bg=BG, fg=FG, font=self.f_brand).pack(side="left")
-        tk.Label(
-            header,
-            text="掷骰 ·  历史只追加、不可修改",
-            bg=BG,
-            fg=DIM,
-            font=self.f_small,
-        ).pack(side="left", padx=(12, 0), pady=(6, 0))
+        tk.Label(header, text="AliDice", bg=C.bg, fg=C.fg, font=self.f_brand).pack(side="left")
+        theme_box = tk.Frame(header, bg=C.card_alt)
+        theme_box.pack(side="right", padx=(0, 10))
+        self.theme_chips = {}
+        for name, label in (("light", "亮色"), ("dark", "暗色")):
+            chip = self._button(
+                theme_box,
+                label,
+                lambda n=name: self._apply_theme(n),
+                kind="ghost",
+                font=self.f_small,
+                pady=4,
+                padx=10,
+            )
+            chip.unbind("<Enter>")
+            chip.unbind("<Leave>")
+            chip.pack(side="left", padx=1, pady=1)
+            self.theme_chips[name] = chip
+        self._sync_theme_chips()
         self.badge = tk.Label(
-            header, text="", bg=OK_BG, fg=ACCENT, font=self.f_tiny, padx=12, pady=6
+            header, text="", bg=C.ok_bg, fg=C.accent, font=self.f_tiny, padx=12, pady=6
         )
         self.badge.pack(side="right")
 
         # 先占住底部工具栏，窗口变矮时优先压缩内容区而不是裁掉按钮
         self._build_footer(root)
 
-        body = tk.Frame(root, bg=BG)
+        body = tk.Frame(root, bg=C.bg)
         body.pack(fill="both", expand=True, pady=(14, 0))
         body.columnconfigure(0, weight=5, uniform="col")
         body.columnconfigure(1, weight=6, uniform="col")
@@ -265,92 +317,89 @@ class DiceApp(tk.Tk):
         self._build_history_card(right)
 
         self._toast_label = tk.Label(
-            self, text="", bg=CARD_ALT, fg=FG, font=self.f_small, padx=14, pady=8
+            self, text="", bg=C.card_alt, fg=C.fg, font=self.f_small, padx=14, pady=8
         )
 
     def _build_roll_card(self, card: tk.Frame) -> None:
         self._hint_wrap = 0
         card.bind("<Configure>", self._on_roll_card_configure)
-        head = tk.Frame(card, bg=CARD)
+        head = tk.Frame(card, bg=C.card)
         head.pack(fill="x", padx=20, pady=(16, 0))
-        tk.Label(head, text="本次结果", bg=CARD, fg=MUTED, font=self.f_small).pack(side="left")
-        self.expr_label = tk.Label(head, text="—", bg=CARD, fg=BLUE, font=self.f_mono_small)
+        tk.Label(head, text="本次结果", bg=C.card, fg=C.muted, font=self.f_small).pack(side="left")
+        self.expr_label = tk.Label(head, text="—", bg=C.card, fg=C.blue, font=self.f_mono_small)
         self.expr_label.pack(side="right")
 
         # 输入区优先占位，窗口变矮时先压缩结果区而不是裁掉输入框
-        bottom = tk.Frame(card, bg=CARD)
+        bottom = tk.Frame(card, bg=C.card)
         bottom.pack(side="bottom", fill="x", padx=20, pady=(0, 18))
 
-        self.total_label = tk.Label(card, text="?", bg=CARD, fg=DIM, font=self.f_huge)
-        self._result_spacer_top = tk.Frame(card, bg=CARD)
+        self.total_label = tk.Label(card, text="?", bg=C.card, fg=C.dim, font=self.f_huge)
+        self._result_spacer_top = tk.Frame(card, bg=C.card)
         self._result_spacer_top.pack(fill="both", expand=True)
         self.total_label.pack(fill="x", padx=16, pady=(6, 0))
 
         self.hint_label = tk.Label(
             card,
             text="输入 xDx（如 3D6），按 Enter 掷骰",
-            bg=CARD,
-            fg=DIM,
+            bg=C.card,
+            fg=C.dim,
             font=self.f_small,
             wraplength=430,
             justify="center",
         )
         self.hint_label.pack(fill="x", padx=20)
 
-        self.chips = tk.Frame(card, bg=CARD, height=88)
-        self._result_spacer_bottom = tk.Frame(card, bg=CARD)
+        self.chips = tk.Frame(card, bg=C.card, height=88)
+        self._result_spacer_bottom = tk.Frame(card, bg=C.card)
         self.chips.pack(fill="x", padx=16, pady=(8, 4))
         self.chips.pack_propagate(False)
         self.chips.bind("<Configure>", self._on_chips_configure)
         self._result_spacer_bottom.pack(fill="both", expand=True)
 
-        self.preset_bar = tk.Frame(bottom, bg=CARD)
+        self.preset_bar = tk.Frame(bottom, bg=C.card)
         self.preset_bar.pack(fill="x")
 
-        row = tk.Frame(bottom, bg=CARD)
+        row = tk.Frame(bottom, bg=C.card)
         row.pack(fill="x", pady=(10, 0))
         self.roll_btn = self._button(row, "掷 骰", self.do_roll, kind="accent", pady=10, padx=22)
         self.roll_btn.pack(side="right", padx=(10, 0))
 
         entry_wrap = tk.Frame(
             row,
-            bg=FIELD,
+            bg=C.field,
             highlightthickness=1,
-            highlightbackground=BORDER,
-            highlightcolor=ACCENT,
+            highlightbackground=C.border,
+            highlightcolor=C.accent,
         )
         entry_wrap.pack(side="left", fill="x", expand=True)
         self.var_expr = tk.StringVar(value="1D100")
         self.entry = tk.Entry(
             entry_wrap,
             textvariable=self.var_expr,
-            bg=FIELD,
-            fg=FG,
-            insertbackground=ACCENT,
+            bg=C.field,
+            fg=C.fg,
+            insertbackground=C.accent,
             relief="flat",
             bd=0,
             font=self.f_mono,
         )
         self.entry.pack(fill="x", padx=14, pady=11)
         self.entry.bind("<Return>", lambda e: self.do_roll())
-        self.entry.bind("<FocusIn>", lambda e: entry_wrap.configure(highlightbackground=ACCENT))
-        self.entry.bind("<FocusOut>", lambda e: entry_wrap.configure(highlightbackground=BORDER))
+        self.entry.bind("<FocusIn>", lambda e: entry_wrap.configure(highlightbackground=C.accent))
+        self.entry.bind("<FocusOut>", lambda e: entry_wrap.configure(highlightbackground=C.border))
         self.entry.focus_set()
         self.entry.select_range(0, "end")
 
     def _build_history_card(self, card: tk.Frame) -> None:
         self._detail_wrap = 0
         card.bind("<Configure>", self._on_history_card_configure)
-        head = tk.Frame(card, bg=CARD)
+        head = tk.Frame(card, bg=C.card)
         head.pack(fill="x", padx=18, pady=(16, 8))
-        tk.Label(head, text="历史记录", bg=CARD, fg=FG, font=self.f_h).pack(side="left")
-        tk.Label(head, text="只读 · 不可修改", bg=CARD, fg=DIM, font=self.f_tiny).pack(
-            side="left", padx=(10, 0), pady=(2, 0)
-        )
-        self.count_label = tk.Label(head, text="", bg=CARD, fg=MUTED, font=self.f_tiny)
+        tk.Label(head, text="历史记录", bg=C.card, fg=C.fg, font=self.f_h).pack(side="left")
+        self.count_label = tk.Label(head, text="", bg=C.card, fg=C.muted, font=self.f_tiny)
         self.count_label.pack(side="right")
 
-        wrap = tk.Frame(card, bg=CARD)
+        wrap = tk.Frame(card, bg=C.card)
         wrap.pack(fill="both", expand=True, padx=16)
         columns = ("idx", "time", "expr", "rolls", "total")
         headings = {
@@ -393,23 +442,21 @@ class DiceApp(tk.Tk):
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.empty_label = tk.Label(
             wrap,
-            text="还没有记录\n掷骰后会自动写入不可修改的历史",
-            bg=CARD,
-            fg=DIM,
+            text="还没有记录",
+            bg=C.card,
+            fg=C.dim,
             font=self.f_small,
             justify="center",
         )
-        self.tree.tag_configure("odd", background=CARD)
-        self.tree.tag_configure("even", background="#1c212c")
-        self.tree.tag_configure("bad", foreground=DANGER)
+        self._apply_tree_tags()
 
-        detail = tk.Frame(card, bg=CARD_ALT, highlightthickness=1, highlightbackground=BORDER)
+        detail = tk.Frame(card, bg=C.card_alt, highlightthickness=1, highlightbackground=C.border)
         detail.pack(fill="x", padx=16, pady=(10, 16))
         self.detail_label = tk.Label(
             detail,
-            text="选中一条记录可查看投掷明细与校验信息",
-            bg=CARD_ALT,
-            fg=MUTED,
+            text="选中记录查看明细",
+            bg=C.card_alt,
+            fg=C.muted,
             font=self.f_tiny,
             justify="left",
             anchor="w",
@@ -420,9 +467,9 @@ class DiceApp(tk.Tk):
         self.detail_label.pack(fill="x")
 
     def _build_footer(self, root: tk.Frame) -> None:
-        bar = tk.Frame(root, bg=BG)
+        bar = tk.Frame(root, bg=C.bg)
         bar.pack(side="bottom", fill="x", pady=(10, 0))
-        self.status_label = tk.Label(bar, text="", bg=BG, fg=DIM, font=self.f_tiny, anchor="w")
+        self.status_label = tk.Label(bar, text="", bg=C.bg, fg=C.dim, font=self.f_tiny, anchor="w")
         self._button(bar, "归档并重置", self._confirm_reset, kind="ghost", pady=5, padx=12).pack(
             side="right"
         )
@@ -525,16 +572,16 @@ class DiceApp(tk.Tk):
 
     def _animate(self, result: dice.RollResult, record: hist.Record) -> None:
         self._animating = True
-        self.roll_btn.configure(state="disabled", bg=CARD_ALT, fg=DIM)
+        self.roll_btn.configure(state="disabled", bg=C.card_alt, fg=C.dim)
         self.expr_label.configure(text=result.notation)
-        self.hint_label.configure(text="掷骰中…", fg=DIM)
+        self.hint_label.configure(text="掷骰中…", fg=C.dim)
         top = max(6, result.total + 4, result.expression.dice_total * 6)
         frames = [random.randint(1, top) for _ in range(9)] + [result.total] * 3
 
         def step(i: int = 0) -> None:
             if i < len(frames):
                 last = i >= len(frames) - 3
-                self.total_label.configure(text=str(frames[i]), fg=GOLD if last else DIM)
+                self.total_label.configure(text=str(frames[i]), fg=C.gold if last else C.dim)
                 self.after(34 + i * 4, step, i + 1)
             else:
                 self._finish(result, record)
@@ -544,11 +591,11 @@ class DiceApp(tk.Tk):
     def _finish(self, result: dice.RollResult, record: hist.Record) -> None:
         self._animating = False
         self.roll_btn.configure(
-            state="normal", bg=ACCENT, fg="#05160f"
+            state="normal", bg=C.accent, fg=C.accent_text
         )
-        self.total_label.configure(text=str(result.total), fg=GOLD)
+        self.total_label.configure(text=str(result.total), fg=C.gold)
         self.expr_label.configure(text=result.notation)
-        self.hint_label.configure(text=self._breakdown_text(result, record), fg=MUTED)
+        self.hint_label.configure(text=self._breakdown_text(result, record), fg=C.muted)
         self._set_chips(result)
         self._last = (result, record)
         self._refresh_history(select=record.index)
@@ -577,13 +624,13 @@ class DiceApp(tk.Tk):
                     if len(items) >= limit:
                         break
                     if value == term.sides:
-                        items.append((str(value), "#2f2a18", GOLD))
+                        items.append((str(value), C.chip_max_bg, C.gold))
                     elif value == 1:
-                        items.append((str(value), "#2a1f26", DANGER))
+                        items.append((str(value), C.chip_min_bg, C.danger))
                     else:
-                        items.append((str(value), FIELD, FG))
+                        items.append((str(value), C.field, C.fg))
                 if len(items) >= limit:
-                    items.append(("…", FIELD, MUTED))
+                    items.append(("…", C.field, C.muted))
                     break
         self._chip_items = items
         self._chips_width = -1
@@ -647,7 +694,7 @@ class DiceApp(tk.Tk):
         for text, bg, fg in self._chip_items:
             chip_w = self.f_chip.measure(text) + 18
             if row is None or used + chip_w > width - 4:
-                row = tk.Frame(self.chips, bg=CARD)
+                row = tk.Frame(self.chips, bg=C.card)
                 row.pack(anchor="w", pady=2)
                 used = 0
             tk.Label(
@@ -662,7 +709,7 @@ class DiceApp(tk.Tk):
             used += chip_w + 6
 
     def _show_error(self, message: str) -> None:
-        self.hint_label.configure(text=message, fg=DANGER)
+        self.hint_label.configure(text=message, fg=C.danger)
         self.after(2400, self._restore_hint)
 
     def _restore_hint(self) -> None:
@@ -670,14 +717,14 @@ class DiceApp(tk.Tk):
             return
         if not self.store.can_append:
             self.hint_label.configure(
-                text="历史校验未通过，掷骰已锁定 · 可点底部「归档并重置」", fg=DANGER
+                text="历史校验未通过，掷骰已锁定 · 可点底部「归档并重置」", fg=C.danger
             )
         elif self._last:
             self.hint_label.configure(
-                text=self._breakdown_text(*self._last), fg=MUTED
+                text=self._breakdown_text(*self._last), fg=C.muted
             )
         else:
-            self.hint_label.configure(text="输入 xDx（如 3D6），按 Enter 掷骰", fg=DIM)
+            self.hint_label.configure(text="输入 xDx（如 3D6），按 Enter 掷骰", fg=C.dim)
 
     # ------------------------------------------------------------ 历史显示
 
@@ -729,7 +776,7 @@ class DiceApp(tk.Tk):
             r.index for r in records
         }:
             self.detail_label.configure(
-                text="选中一条记录可查看投掷明细与校验信息", fg=MUTED
+                text="选中记录查看明细", fg=C.muted
             )
 
     def _on_select(self, event=None) -> None:
@@ -750,7 +797,7 @@ class DiceApp(tk.Tk):
                 f"点数 {rolls}\n"
                 f"合计 {rec.total}　·　{verified}　·　MAC {rec.short_tag}"
             ),
-            fg=MUTED if rec.verified else DANGER,
+            fg=C.muted if rec.verified else C.danger,
         )
 
     # ------------------------------------------------------------ 状态
@@ -760,12 +807,12 @@ class DiceApp(tk.Tk):
         count = len(self.store.records)
         if rep.can_append:
             self.badge.configure(
-                text=f"✔ 历史已校验 · {count} 条", bg=OK_BG, fg=ACCENT
+                text=f"✔ 历史已校验 · {count} 条", bg=C.ok_bg, fg=C.accent
             )
         elif rep.state == hist.STATE_UNVERIFIABLE:
-            self.badge.configure(text="⚠ 无法校验 · 已锁定", bg=WARN_BG, fg=GOLD)
+            self.badge.configure(text="⚠ 无法校验 · 已锁定", bg=C.warn_bg, fg=C.gold)
         else:
-            self.badge.configure(text="⚠ 历史异常 · 已锁定", bg=DANGER_BG, fg=DANGER)
+            self.badge.configure(text="⚠ 历史异常 · 已锁定", bg=C.danger_bg, fg=C.danger)
 
     def _update_footer(self) -> None:
         rep = self.store.report
@@ -823,9 +870,9 @@ class DiceApp(tk.Tk):
         self._chip_items = []
         self._chips_width = -1
         self._relayout_chips()
-        self.total_label.configure(text="?", fg=DIM)
+        self.total_label.configure(text="?", fg=C.dim)
         self.expr_label.configure(text="—")
-        self.hint_label.configure(text="已开始新的校验链", fg=MUTED)
+        self.hint_label.configure(text="已开始新的校验链", fg=C.muted)
         self._refresh_history()
         self._update_badge()
         self._update_footer()
@@ -979,6 +1026,8 @@ def main() -> None:
         messagebox.showwarning("AliDice", "AliDice 已经在运行了。")
         root.destroy()
         return
+
+    theme.switch(load_theme_name())
 
     store = hist.HistoryStore()
     try:

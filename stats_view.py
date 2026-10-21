@@ -15,24 +15,10 @@ from typing import Dict, List, Optional, Tuple
 import history as hist
 import stats as statsmod
 import theme
-from theme import (
-    ACCENT,
-    BG,
-    BLUE,
-    BORDER,
-    CARD,
-    CARD_ALT,
-    DIM,
-    FG,
-    FIELD,
-    GOLD,
-    MUTED,
-    SERIES,
-)
+from theme import C
 
 MAX_SIDES_UI = 10000
 TABLE_ROW_LIMIT = 1000
-SELECTED_BG = "#2b3b57"
 
 
 def _mix(color_a: str, color_b: str, t: float) -> str:
@@ -70,7 +56,7 @@ class StatsWindow(tk.Toplevel):
         self._summary_wrap = 900
 
         self.title("AliDice · 统计")
-        self.configure(bg=BG)
+        self.configure(bg=C.bg)
         self.transient(master)
         self._setup_fonts()
         self._setup_style()
@@ -119,36 +105,36 @@ class StatsWindow(tk.Toplevel):
         style.layout("Stats.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
         style.configure(
             "Stats.Treeview",
-            background=CARD,
-            fieldbackground=CARD,
-            foreground=FG,
+            background=C.card,
+            fieldbackground=C.card,
+            foreground=C.fg,
             borderwidth=0,
             rowheight=24,
             font=self.f_small,
         )
         style.configure(
             "Stats.Treeview.Heading",
-            background=CARD_ALT,
-            foreground=MUTED,
+            background=C.card_alt,
+            foreground=C.muted,
             borderwidth=0,
             relief="flat",
             font=self.f_tiny,
         )
-        style.map("Stats.Treeview", background=[("selected", SELECTED_BG)])
-        style.map("Stats.Treeview.Heading", background=[("active", CARD_ALT)])
+        style.map("Stats.Treeview", background=[("selected", C.selected)])
+        style.map("Stats.Treeview.Heading", background=[("active", C.card_alt)])
         style.configure(
             "Stats.Vertical.TScrollbar",
-            background=CARD_ALT,
-            troughcolor=BG,
-            bordercolor=BG,
-            arrowcolor=MUTED,
+            background=C.card_alt,
+            troughcolor=C.bg,
+            bordercolor=C.bg,
+            arrowcolor=C.muted,
             relief="flat",
             width=10,
         )
 
     def _card(self, master) -> tk.Frame:
         return tk.Frame(
-            master, bg=CARD, highlightthickness=1, highlightbackground=BORDER
+            master, bg=C.card, highlightthickness=1, highlightbackground=C.border
         )
 
     def _chip(self, parent, text, command, active=False) -> tk.Button:
@@ -156,10 +142,10 @@ class StatsWindow(tk.Toplevel):
             parent,
             text=text,
             command=command,
-            bg=SELECTED_BG if active else FIELD,
-            fg=FG if active else MUTED,
-            activebackground=SELECTED_BG if active else "#2b3446",
-            activeforeground=FG,
+            bg=C.selected if active else C.field,
+            fg=C.fg if active else C.muted,
+            activebackground=C.selected if active else C.hover,
+            activeforeground=C.fg,
             relief="flat",
             bd=0,
             highlightthickness=0,
@@ -173,39 +159,39 @@ class StatsWindow(tk.Toplevel):
     # ------------------------------------------------------------ 布局
 
     def _build_ui(self) -> None:
-        head = tk.Frame(self, bg=BG)
+        head = tk.Frame(self, bg=C.bg)
         head.pack(fill="x", padx=18, pady=(14, 0))
-        tk.Label(head, text="统计", bg=BG, fg=FG, font=self.f_brand).pack(side="left")
-        self.sub_label = tk.Label(head, text="", bg=BG, fg=DIM, font=self.f_small)
+        tk.Label(head, text="统计", bg=C.bg, fg=C.fg, font=self.f_brand).pack(side="left")
+        self.sub_label = tk.Label(head, text="", bg=C.bg, fg=C.dim, font=self.f_small)
         self.sub_label.pack(side="left", padx=(10, 0), pady=(5, 0))
 
         controls = self._card(self)
         controls.pack(fill="x", padx=18, pady=(12, 0))
-        row = tk.Frame(controls, bg=CARD)
+        row = tk.Frame(controls, bg=C.card)
         row.pack(fill="x", padx=14, pady=10)
 
-        tk.Label(row, text="骰子", bg=CARD, fg=MUTED, font=self.f_small).pack(side="left")
+        tk.Label(row, text="骰子", bg=C.card, fg=C.muted, font=self.f_small).pack(side="left")
         self.die_chips: Dict[int, tk.Button] = {}
         for sides in (10, 100):
             btn = self._chip(row, f"1D{sides}", lambda s=sides: self._set_sides(s))
             btn.pack(side="left", padx=(8, 0))
             self.die_chips[sides] = btn
 
-        tk.Label(row, text="自定义 1D", bg=CARD, fg=MUTED, font=self.f_small).pack(
+        tk.Label(row, text="自定义 1D", bg=C.card, fg=C.muted, font=self.f_small).pack(
             side="left", padx=(16, 0)
         )
         self.custom_var = tk.StringVar()
         entry_wrap = tk.Frame(
-            row, bg=FIELD, highlightthickness=1, highlightbackground=BORDER, highlightcolor=ACCENT
+            row, bg=C.field, highlightthickness=1, highlightbackground=C.border, highlightcolor=C.accent
         )
         entry_wrap.pack(side="left", padx=(8, 0))
         self.custom_entry = tk.Entry(
             entry_wrap,
             textvariable=self.custom_var,
             width=7,
-            bg=FIELD,
-            fg=FG,
-            insertbackground=ACCENT,
+            bg=C.field,
+            fg=C.fg,
+            insertbackground=C.accent,
             relief="flat",
             bd=0,
             font=self.f_mono,
@@ -215,19 +201,19 @@ class StatsWindow(tk.Toplevel):
         self.custom_entry.bind("<Return>", lambda e: self._apply_custom())
         self._chip(row, "统计", self._apply_custom).pack(side="left", padx=(6, 0))
 
-        tk.Frame(row, bg=BORDER, width=1).pack(side="left", fill="y", padx=14)
-        tk.Label(row, text="图表", bg=CARD, fg=MUTED, font=self.f_small).pack(side="left")
+        tk.Frame(row, bg=C.border, width=1).pack(side="left", fill="y", padx=14)
+        tk.Label(row, text="图表", bg=C.card, fg=C.muted, font=self.f_small).pack(side="left")
         self.chart_chips: Dict[str, tk.Button] = {}
         for kind, label in (("bar", "柱状图"), ("pie", "饼图")):
             btn = self._chip(row, label, lambda k=kind: self._set_chart(k))
             btn.pack(side="left", padx=(8, 0))
             self.chart_chips[kind] = btn
 
-        spacer = tk.Frame(row, bg=CARD)
+        spacer = tk.Frame(row, bg=C.card)
         spacer.pack(side="left", fill="x", expand=True)
         self._chip(row, "刷新", self.refresh).pack(side="right")
 
-        body = tk.Frame(self, bg=BG)
+        body = tk.Frame(self, bg=C.bg)
         body.pack(fill="both", expand=True, padx=18, pady=(12, 0))
         body.columnconfigure(0, weight=1)
         body.columnconfigure(1, minsize=300, weight=0)
@@ -235,18 +221,18 @@ class StatsWindow(tk.Toplevel):
 
         chart_card = self._card(body)
         chart_card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        inner = tk.Frame(chart_card, bg=CARD)
+        inner = tk.Frame(chart_card, bg=C.card)
         inner.pack(fill="both", expand=True, padx=1, pady=1)
-        self.canvas = tk.Canvas(inner, bg=CARD, highlightthickness=0)
+        self.canvas = tk.Canvas(inner, bg=C.card, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, padx=10, pady=(10, 2))
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.canvas.bind("<Motion>", self._on_motion)
         self.canvas.bind("<Leave>", self._on_leave)
         self.hint = tk.Label(
             inner,
-            text="将鼠标移到柱子或饼图上查看明细",
-            bg=CARD,
-            fg=DIM,
+            text="",
+            bg=C.card,
+            fg=C.dim,
             font=self.f_tiny,
             anchor="w",
         )
@@ -254,15 +240,15 @@ class StatsWindow(tk.Toplevel):
 
         table_card = self._card(body)
         table_card.grid(row=0, column=1, sticky="nsew")
-        tinner = tk.Frame(table_card, bg=CARD)
+        tinner = tk.Frame(table_card, bg=C.card)
         tinner.pack(fill="both", expand=True, padx=1, pady=1)
-        thead = tk.Frame(tinner, bg=CARD)
+        thead = tk.Frame(tinner, bg=C.card)
         thead.pack(fill="x", padx=12, pady=(10, 6))
-        tk.Label(thead, text="分布表", bg=CARD, fg=FG, font=self.f_h).pack(side="left")
-        self.table_info = tk.Label(thead, text="", bg=CARD, fg=DIM, font=self.f_tiny)
+        tk.Label(thead, text="分布表", bg=C.card, fg=C.fg, font=self.f_h).pack(side="left")
+        self.table_info = tk.Label(thead, text="", bg=C.card, fg=C.dim, font=self.f_tiny)
         self.table_info.pack(side="right")
 
-        wrap = tk.Frame(tinner, bg=CARD)
+        wrap = tk.Frame(tinner, bg=C.card)
         wrap.pack(fill="both", expand=True, padx=(10, 8), pady=(0, 10))
         cols = ("face", "count", "pct")
         self.tree = ttk.Treeview(
@@ -285,18 +271,15 @@ class StatsWindow(tk.Toplevel):
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
-        self.tree.tag_configure("hot", foreground=GOLD)
-        self.tree.tag_configure("zero", foreground=DIM)
-        self.tree.tag_configure("odd", background=CARD)
-        self.tree.tag_configure("even", background="#1c212c")
+        self._configure_tags()
 
-        foot = tk.Frame(self, bg=BG)
+        foot = tk.Frame(self, bg=C.bg)
         foot.pack(fill="x", padx=18, pady=(10, 12))
         self.summary = tk.Label(
             foot,
             text="",
-            bg=BG,
-            fg=MUTED,
+            bg=C.bg,
+            fg=C.muted,
             font=self.f_small,
             anchor="w",
             justify="left",
@@ -305,6 +288,22 @@ class StatsWindow(tk.Toplevel):
         self.summary.pack(fill="x")
         self.bind("<Configure>", self._on_window_configure)
         self.bind("<Escape>", lambda e: self.destroy())
+
+    def apply_theme(self, mapping=None) -> None:
+        if mapping:
+            theme.apply_to_widgets(self, mapping)
+        self._setup_style()
+        self._configure_tags()
+        self._sync_chips()
+        self._update_table()
+        self._update_summary()
+        self._redraw()
+
+    def _configure_tags(self) -> None:
+        self.tree.tag_configure("hot", foreground=C.gold)
+        self.tree.tag_configure("zero", foreground=C.dim)
+        self.tree.tag_configure("odd", background=C.card)
+        self.tree.tag_configure("even", background=C.row_alt)
 
     def _on_window_configure(self, event=None) -> None:
         if event is not None and event.widget is not self:
@@ -354,21 +353,21 @@ class StatsWindow(tk.Toplevel):
         for sides, btn in self.die_chips.items():
             active = sides == self.sides
             btn.configure(
-                bg=SELECTED_BG if active else FIELD,
-                fg=FG if active else MUTED,
-                activebackground=SELECTED_BG if active else "#2b3446",
+                bg=C.selected if active else C.field,
+                fg=C.fg if active else C.muted,
+                activebackground=C.selected if active else C.hover,
             )
         for kind, btn in self.chart_chips.items():
             active = kind == self.chart_kind
             btn.configure(
-                bg=SELECTED_BG if active else FIELD,
-                fg=FG if active else MUTED,
-                activebackground=SELECTED_BG if active else "#2b3446",
+                bg=C.selected if active else C.field,
+                fg=C.fg if active else C.muted,
+                activebackground=C.selected if active else C.hover,
             )
         custom_active = self.sides not in self.die_chips
         self.custom_entry.configure(
-            bg=SELECTED_BG if custom_active else FIELD,
-            fg=FG if custom_active else MUTED,
+            bg=C.selected if custom_active else C.field,
+            fg=C.fg if custom_active else C.muted,
         )
 
     # ------------------------------------------------------------ 数据
@@ -378,10 +377,7 @@ class StatsWindow(tk.Toplevel):
             return
         self.stats = statsmod.collect(self.store.records, self.sides)
         self.sub_label.configure(
-            text=(
-                f"当前 1D{self.sides}　·　{len(self.store.records)} 条历史记录"
-                "　·　xDy 按 x 个 1Dy 统计"
-            )
+            text=f"当前 1D{self.sides}　·　{len(self.store.records)} 条历史记录"
         )
         self._sync_chips()
         self._update_table()
@@ -416,13 +412,16 @@ class StatsWindow(tk.Toplevel):
             self.table_info.configure(text=f"仅显示出现过的点数（共 {st.sides} 面）")
         else:
             self.table_info.configure(text=f"{len(faces)} 行")
+        # 重建后清掉 Tk 残留的焦点项高亮
+        self.tree.focus("")
+        self.tree.selection_remove(*self.tree.selection())
 
     def _update_summary(self) -> None:
         st = self.stats
         if st is None or st.total == 0:
             self.summary.configure(
-                text=f"还没有 1D{self.sides} 的点数记录——先在主窗口掷几次骰吧。",
-                fg=DIM,
+                text=f"还没有 1D{self.sides} 的记录。",
+                fg=C.dim,
             )
             return
         hot = st.hottest
@@ -446,7 +445,7 @@ class StatsWindow(tk.Toplevel):
             notes.append(f"{st.records_ignored} 条无法解析的记录未计入")
         if notes:
             text += "\n" + "；".join(notes) + "。"
-        self.summary.configure(text=text, fg=MUTED)
+        self.summary.configure(text=text, fg=C.muted)
 
     # ------------------------------------------------------------ 绘制
 
@@ -479,7 +478,7 @@ class StatsWindow(tk.Toplevel):
                 width / 2,
                 height / 2,
                 text=f"没有可统计的 1D{self.sides} 记录",
-                fill=DIM,
+                fill=C.dim,
                 font=self.f_ui,
             )
             self.hint.configure(text="在主窗口掷骰后，这里会自动更新")
@@ -509,10 +508,10 @@ class StatsWindow(tk.Toplevel):
         for i in range(5):
             y = pad_t + plot_h * i / 4
             value = y_max * (1 - i / 4)
-            self.canvas.create_line(pad_l, y, width - pad_r, y, fill=BORDER)
+            self.canvas.create_line(pad_l, y, width - pad_r, y, fill=C.border)
             label = f"{value:g}"
             self.canvas.create_text(
-                pad_l - 8, y, text=label, anchor="e", fill=DIM, font=self.f_chart
+                pad_l - 8, y, text=label, anchor="e", fill=C.dim, font=self.f_chart
             )
 
         slot = plot_w / len(bins)
@@ -523,7 +522,7 @@ class StatsWindow(tk.Toplevel):
             bar_h = plot_h * (b.count / y_max)
             y0 = pad_t + plot_h - bar_h
             expected = st.total * b.width / st.sides if st.sides else 0.0
-            color = _mix(ACCENT, GOLD, (b.count / max_count) if max_count else 0.0)
+            color = _mix(C.accent, C.gold, (b.count / max_count) if max_count else 0.0)
             rect = self.canvas.create_rectangle(
                 x0, y0, max(x1, x0 + 1), pad_t + plot_h, fill=color, outline=""
             )
@@ -544,19 +543,19 @@ class StatsWindow(tk.Toplevel):
         if uniform:
             exp_y = pad_t + plot_h * (1 - st.expected / y_max)
             self.canvas.create_line(
-                pad_l, exp_y, width - pad_r, exp_y, fill=BLUE, dash=(4, 4)
+                pad_l, exp_y, width - pad_r, exp_y, fill=C.blue, dash=(4, 4)
             )
             self.canvas.create_text(
                 width - pad_r - 4,
                 exp_y - 9,
                 text=f"期望 {st.expected:.1f}",
                 anchor="e",
-                fill=BLUE,
+                fill=C.blue,
                 font=self.f_chart,
             )
 
         self.canvas.create_line(
-            pad_l, pad_t + plot_h, width - pad_r, pad_t + plot_h, fill=BORDER
+            pad_l, pad_t + plot_h, width - pad_r, pad_t + plot_h, fill=C.border
         )
 
         step = max(1, math.ceil(len(bins) / 12))
@@ -567,13 +566,11 @@ class StatsWindow(tk.Toplevel):
                 pad_t + plot_h + 8,
                 text=bins[i].label,
                 anchor="n",
-                fill=MUTED,
+                fill=C.muted,
                 font=self.f_chart,
             )
 
-        self.hint.configure(
-            text="柱状图：颜色越接近金色表示出现越多；虚线为均匀期望值"
-        )
+        self.hint.configure(text="")
 
     def _draw_pie(self, width: int, height: int) -> None:
         st = self.stats
@@ -587,14 +584,14 @@ class StatsWindow(tk.Toplevel):
                         f"点数 {face.face}",
                         face.count,
                         face.ratio,
-                        SERIES[(face.face - 1) % len(SERIES)],
+                        C.series[(face.face - 1) % len(C.series)],
                     )
                 )
         else:
             bins = st.bins(10)
             for i, b in enumerate(bins):
                 slices.append(
-                    (f"点数 {b.label}", b.count, b.ratio, SERIES[i % len(SERIES)])
+                    (f"点数 {b.label}", b.count, b.ratio, C.series[i % len(C.series)])
                 )
         if not slices:
             return
@@ -627,7 +624,7 @@ class StatsWindow(tk.Toplevel):
                 start=angle,
                 extent=extent,
                 fill=color,
-                outline=CARD,
+                outline=C.card,
                 width=2,
             )
             lo = angle % 360.0
@@ -650,7 +647,7 @@ class StatsWindow(tk.Toplevel):
                     lx,
                     ly,
                     text=f"{ratio * 100:.1f}%",
-                    fill="#0b0d12",
+                    fill=C.chart_label,
                     font=self.f_pie,
                 )
             angle += extent
@@ -667,17 +664,12 @@ class StatsWindow(tk.Toplevel):
                 y + 7,
                 text=legend_texts[i],
                 anchor="w",
-                fill=MUTED,
+                fill=C.muted,
                 font=self.f_chart,
             )
             y += 22
 
-        note = (
-            f"饼图：面数较多，按区间合并为 {len(slices)} 段（每段 {st.sides // len(slices)} 面左右）"
-            if st.sides > 12
-            else "饼图：按点数占比"
-        )
-        self.hint.configure(text=note)
+        self.hint.configure(text="")
 
     # ------------------------------------------------------------ 悬停
 
@@ -727,12 +719,12 @@ class StatsWindow(tk.Toplevel):
         for info in self._bar_hits:
             self.canvas.itemconfigure(info["rect"], outline="", width=0)
         for info in self._pie_hits:
-            self.canvas.itemconfigure(info["arc"], outline=CARD, width=2)
+            self.canvas.itemconfigure(info["arc"], outline=C.card, width=2)
         if hit is None:
-            self.hint.configure(text="将鼠标移到柱子或饼图上查看明细")
+            self.hint.configure(text="")
             return
         if kind == "bar":
-            self.canvas.itemconfigure(hit["rect"], outline=FG, width=1)
+            self.canvas.itemconfigure(hit["rect"], outline=C.fg, width=1)
             self.hint.configure(
                 text=(
                     f"{hit['label']}：{hit['count']} 次（{hit['ratio'] * 100:.2f}%）"
@@ -740,7 +732,7 @@ class StatsWindow(tk.Toplevel):
                 )
             )
         else:
-            self.canvas.itemconfigure(hit["arc"], outline=FG, width=1)
+            self.canvas.itemconfigure(hit["arc"], outline=C.fg, width=1)
             self.hint.configure(
                 text=f"{hit['label']}：{hit['count']} 次（{hit['ratio'] * 100:.2f}%）"
             )
