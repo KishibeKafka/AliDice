@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+# 历史数据与用户配置属于本地运行产物
+data/
+config.json

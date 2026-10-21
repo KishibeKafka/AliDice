@@ -1,0 +1,131 @@
+# AliDice 🎲
+
+图形化骰子，支持 `xDx` 表达式，默认提供 **1D100** 和 **1D10**。所有投掷结果写入
+**只追加的二进制历史文件**，界面上没有任何修改/删除历史的入口；文件被改动过
+会被校验发现并锁定。
+
+```
+python app.py          # 或双击 run.bat（无控制台窗口）
+python selftest.py     # 核心逻辑 + 篡改检测自测
+python verify.py       # 只读校验历史完整性
+```
+
+只需要 Python 3.9+（标准库 Tkinter，无第三方依赖）。Windows / macOS / Linux 均可运行。
+
+---
+
+## 功能
+
+| 功能 | 说明 |
+| --- | --- |
+| `xDx` 表达式 | `1D100`、`3d6`、`2D20+1D8-2`（多骰子组 + 固定修正值，大小写与空格随意） |
+| 预设骰子 | 默认 **1D100**、**1D10**；`＋ 预设` 添加，右键预设可移除（保存在 `config.json`） |
+| 结果展示 | 大号合计 + 逐颗点数；掷出最大点显示金色、最小点显示红色 |
+| 历史记录 | 最新在上，含时间、表达式、逐颗点数、合计；选中可看 MAC 校验信息 |
+| 不可修改历史 | 只追加二进制日志 + HMAC 链 + 独立 seal；界面无编辑/删除入口 |
+| 完整性状态 | 顶部徽标 + 状态栏显示“已校验 / 历史异常 / 无法校验”，异常时锁定掷骰 |
+| 归档重置 | 历史被删除、替换或需要重新开始时，把旧文件**归档**（不删除）后开新链 |
+
+## 表达式语法
+
+```
+xDx            投 x 个 y 面骰（x 省略时为 1）
+xDx + k        带固定修正值
+xDx + aDb - k  多个骰子组相加
+```
+
+限制：单个骰子组 ≤ 1000 颗、总骰子数 ≤ 1000、面数 ≤ 1,000,000、最多 32 组。
+骰子组本身不能取负（负号用于固定修正值），例如 `3D6-2` 合法，`-2D6` 不合法。
+
+## 历史为什么改不了
+
+写入路径只有一条：`HistoryStore.append()`。它做了四件事：
+
+1. **只追加的二进制日志**
+   每条记录带连续序号、时间戳、上一记录的 MAC、自身 MAC。改一个字节、删中间一条、
+   调换顺序、从别的历史文件里复制记录进来，都会在下次打开时被定位到具体条目。
+
+2. **系统层面的只追加句柄**
+   Windows 上通过 `CreateFileW` 以 `FILE_APPEND_DATA`（不含 `GENERIC_WRITE`）打开文件，
+   这个句柄在系统层面没有覆盖写权限——即使程序自己有 bug 也改不了已落盘的字节；
+   同时以“拒绝写入”方式共享文件，程序运行期间其它进程也写不进去。写入后立即
+   `FlushFileBuffers` 并读回校验最后一条记录的 MAC。
+
+3. **密钥在数据目录之外，并绑定机器**
+   MAC 密钥 = `HMAC(随机 secret, 机器指纹)`。secret 与 seal 放在
+   `%LOCALAPPDATA%\AliDice\`（Linux 为 `~/.local/share/AliDice/`），不在 `data/` 里。
+   所以“改完数据再重算校验”需要同时拿到 secret 并且身处同一台机器。
+
+4. **独立的 seal（防截断）**
+   链式校验发现不了“把最后几条删掉”——剩下的链依然自洽。seal 文件记录
+   `条数 + 链头 MAC + file_id`，打开时与数据文件比对：少了记录、换了文件、
+   seal 链头不符，都会判定为被改动。
+   `seal.bin` 是“当前链”的锚（数据文件被整个删掉也能被发现）；
+   `seals/<file_id>.seal` 是每条历史自己的封印，所以归档出来的
+   `history-*.dat` 也能用 `verify.py --file` 独立校验。
+
+### 文件格式（小端）
+
+```
+文件头  32 B : magic "ALIDICE1"(8) version(2) flags(2) file_id(16) reserved(4)
+记录        : 记录头 64 B | payload | tag 32 B
+记录头  64 B : magic "REC\0"(4) index(4) payload_len(4) ts_ms(8)
+               version(2) reserved(10) prev_tag(32)
+tag         : HMAC(密钥, "REC" | file_id | 记录头 | payload)
+payload     : notation_len(1) notation(utf-8) roll_count(4) modifier(4)
+              total(8) rolls(i32 × roll_count)
+seal    96 B : magic "ALIDSEAL"(8) version(2) reserved(2) count(4)
+               file_id(16) head_tag(32) mac(32)
+```
+
+`file_id` 是首次创建历史文件时生成的随机值，参与每条记录的 MAC，因此从别的
+历史文件里拷进来的记录一定验不过。
+
+### 校验状态
+
+| 状态 | 含义 | 行为 |
+| --- | --- | --- |
+| `ok` / `empty` | 校验通过 | 可以继续掷骰、追加历史 |
+| `tampered` | 字节被改、记录被删/重排/拼接、文件被删除替换、seal 不符 | 只读展示已读到的内容并标红 `⚠`，锁定掷骰 |
+| `unverifiable` | 密钥 / 机器指纹不匹配（例如把数据拷到另一台电脑） | 同上 |
+
+被锁定时，界面提供“**归档并重置**”：把当前文件重命名为
+`data/history-YYYYmmdd-HHMMSS.dat` 留档（不删除），然后从空历史开始新的校验链。
+归档文件可以随时用 `verify.py --data-dir` 单独校验。
+
+## 命令行校验
+
+```
+python verify.py                 # 最近 20 条
+python verify.py --tail 0        # 全部记录
+python verify.py --data-dir "D:\某处\data"
+python verify.py --file data/history-20260510-120000.dat   # 校验归档文件
+```
+
+输出状态、链头与逐条记录（`[OK]` / `[BAD]`），退出码 0 表示完整，1 表示不可信。
+
+## 文件说明
+
+| 路径 | 说明 |
+| --- | --- |
+| `app.py` | Tkinter 图形界面 |
+| `dice.py` | 表达式解析与投掷（`SystemRandom`） |
+| `history.py` | 只追加二进制历史、HMAC 链、seal、归档 |
+| `selftest.py` | 自测：解析、追加、重开、六种篡改、归档、seal 追平 |
+| `verify.py` | 只读校验工具 |
+| `config.json` | 预设骰子（自动生成） |
+| `data/history.dat` | 历史数据（自动生成） |
+| `%LOCALAPPDATA%/AliDice/secret.bin` | 随机密钥（隐藏文件，勿删除） |
+| `%LOCALAPPDATA%/AliDice/seal.bin` | 当前链的锚：条数 + 链头 + file_id |
+| `%LOCALAPPDATA%/AliDice/seals/<file_id>.seal` | 每条历史自己的封印（归档文件也能校验） |
+
+> 删掉 `secret.bin` 或更换机器后，旧历史将无法校验，界面会进入“无法校验”状态，
+> 此时只能归档旧文件后重新开始。
+
+## 安全边界（诚实说明）
+
+这套机制保证的是：**没有密钥的人无法在不被发现的情况下修改、删除、伪造或截断
+历史**；程序自身也无法覆盖写已落盘的字节。它不是“防住拥有你账户完全控制权的
+对手”：如果对方既能读 `secret.bin` 与 `seal.bin`，又有文件写权限，理论上可以
+重算整条链（代价远高于随手改文件，且必须在这台机器上）。要抵抗这种对手，
+应把 `data/` 放到只追加介质（WORM 光盘、一次性写入的云存储）上。

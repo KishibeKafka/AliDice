@@ -1,0 +1,5 @@
+# 统一换行：源码用 LF，Windows 批处理用 CRLF
+* text=auto eol=lf
+*.bat text eol=crlf
+*.dat binary
+*.png binary
