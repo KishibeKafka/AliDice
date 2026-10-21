@@ -19,25 +19,25 @@ from typing import List, Optional, Tuple
 
 import dice
 import history as hist
-
-# ---------------------------------------------------------------- 主题
-
-BG = "#0e1016"
-CARD = "#181c26"
-CARD_ALT = "#1e2330"
-FIELD = "#202634"
-BORDER = "#2b3242"
-FG = "#e9edf6"
-MUTED = "#8b95a8"
-DIM = "#5b6478"
-ACCENT = "#5ee0b0"
-ACCENT_HOVER = "#7cf0c6"
-BLUE = "#7aa2ff"
-GOLD = "#ffcf6b"
-DANGER = "#ff6b6b"
-DANGER_BG = "#3a1f24"
-OK_BG = "#17362c"
-WARN_BG = "#3a3021"
+import theme
+from theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    BG,
+    BLUE,
+    BORDER,
+    CARD,
+    CARD_ALT,
+    DANGER,
+    DANGER_BG,
+    DIM,
+    FG,
+    FIELD,
+    GOLD,
+    MUTED,
+    OK_BG,
+    WARN_BG,
+)
 
 CONFIG_PATH = os.path.join(hist.project_dir(), "config.json")
 DEFAULT_PRESETS = ("1D100", "1D10")
@@ -80,14 +80,6 @@ def save_presets(presets: List[str]) -> None:
         pass
 
 
-def _pick_family(root: tk.Misc, candidates) -> str:
-    families = set(tkfont.families(root))
-    for name in candidates:
-        if name in families:
-            return name
-    return str(tkfont.nametofont("TkDefaultFont").actual("family"))
-
-
 # ---------------------------------------------------------------- 主窗口
 
 
@@ -103,6 +95,7 @@ class DiceApp(tk.Tk):
         self._chips_width = -1
         self._toast_job = None
         self._detail_record: Optional[hist.Record] = None
+        self._stats_win = None
 
         self.title("AliDice · 骰子")
         self.configure(bg=BG)
@@ -133,31 +126,18 @@ class DiceApp(tk.Tk):
         y = max(0, (screen_h - height) // 3)
         self.geometry(f"{width}x{height}+{x}+{y}")
 
+        self.bind("<Control-t>", lambda e: self._open_stats())
+
         if not self.store.report.can_append:
             self.after(400, self._show_integrity_notice)
 
     # ------------------------------------------------------------ 外观
 
     def _setup_fonts(self) -> None:
-        ui = _pick_family(
-            self,
-            (
-                "Microsoft YaHei UI",
-                "Microsoft YaHei",
-                "PingFang SC",
-                "Noto Sans CJK SC",
-                "Source Han Sans SC",
-                "WenQuanYi Micro Hei",
-                "Segoe UI",
-                "DejaVu Sans",
-            ),
-        )
-        mono = _pick_family(
-            self,
-            ("Cascadia Mono", "Consolas", "JetBrains Mono", "DejaVu Sans Mono", "Courier New"),
-        )
+        ui = theme.pick_family(self, theme.UI_FONTS)
+        mono = theme.pick_family(self, theme.MONO_FONTS)
         self.f_brand = (ui, 20, "bold")
-        self.f_huge = (ui, 46, "bold")
+        self.f_huge = (ui, 40, "bold")
         self.f_h = (ui, 12, "bold")
         self.f_ui = (ui, 11)
         self.f_small = (ui, 10)
@@ -268,6 +248,9 @@ class DiceApp(tk.Tk):
         )
         self.badge.pack(side="right")
 
+        # 先占住底部工具栏，窗口变矮时优先压缩内容区而不是裁掉按钮
+        self._build_footer(root)
+
         body = tk.Frame(root, bg=BG)
         body.pack(fill="both", expand=True, pady=(14, 0))
         body.columnconfigure(0, weight=5, uniform="col")
@@ -280,7 +263,6 @@ class DiceApp(tk.Tk):
         right.grid(row=0, column=1, sticky="nsew", padx=(9, 0))
         self._build_roll_card(left)
         self._build_history_card(right)
-        self._build_footer(root)
 
         self._toast_label = tk.Label(
             self, text="", bg=CARD_ALT, fg=FG, font=self.f_small, padx=14, pady=8
@@ -295,6 +277,10 @@ class DiceApp(tk.Tk):
         self.expr_label = tk.Label(head, text="—", bg=CARD, fg=BLUE, font=self.f_mono_small)
         self.expr_label.pack(side="right")
 
+        # 输入区优先占位，窗口变矮时先压缩结果区而不是裁掉输入框
+        bottom = tk.Frame(card, bg=CARD)
+        bottom.pack(side="bottom", fill="x", padx=20, pady=(0, 18))
+
         self.total_label = tk.Label(card, text="?", bg=CARD, fg=DIM, font=self.f_huge)
         self._result_spacer_top = tk.Frame(card, bg=CARD)
         self._result_spacer_top.pack(fill="both", expand=True)
@@ -302,7 +288,7 @@ class DiceApp(tk.Tk):
 
         self.hint_label = tk.Label(
             card,
-            text="输入 xDx（例如 3D6），按 Enter 掷骰",
+            text="输入 xDx（如 3D6），按 Enter 掷骰",
             bg=CARD,
             fg=DIM,
             font=self.f_small,
@@ -311,15 +297,12 @@ class DiceApp(tk.Tk):
         )
         self.hint_label.pack(fill="x", padx=20)
 
-        self.chips = tk.Frame(card, bg=CARD, height=96)
+        self.chips = tk.Frame(card, bg=CARD, height=88)
         self._result_spacer_bottom = tk.Frame(card, bg=CARD)
         self.chips.pack(fill="x", padx=16, pady=(8, 4))
         self.chips.pack_propagate(False)
         self.chips.bind("<Configure>", self._on_chips_configure)
         self._result_spacer_bottom.pack(fill="both", expand=True)
-
-        bottom = tk.Frame(card, bg=CARD)
-        bottom.pack(fill="x", padx=20, pady=(0, 18))
 
         self.preset_bar = tk.Frame(bottom, bg=CARD)
         self.preset_bar.pack(fill="x")
@@ -438,12 +421,15 @@ class DiceApp(tk.Tk):
 
     def _build_footer(self, root: tk.Frame) -> None:
         bar = tk.Frame(root, bg=BG)
-        bar.pack(fill="x", pady=(10, 0))
+        bar.pack(side="bottom", fill="x", pady=(10, 0))
         self.status_label = tk.Label(bar, text="", bg=BG, fg=DIM, font=self.f_tiny, anchor="w")
         self._button(bar, "归档并重置", self._confirm_reset, kind="ghost", pady=5, padx=12).pack(
             side="right"
         )
         self._button(bar, "复制结果", self._copy_result, kind="ghost", pady=5, padx=12).pack(
+            side="right", padx=(0, 8)
+        )
+        self._button(bar, "统计图表", self._open_stats, kind="ghost", pady=5, padx=12).pack(
             side="right", padx=(0, 8)
         )
         self.status_label.pack(side="left", fill="x", expand=True)
@@ -568,6 +554,7 @@ class DiceApp(tk.Tk):
         self._refresh_history(select=record.index)
         self._update_badge()
         self._update_footer()
+        self._refresh_stats_window()
 
     def _breakdown_text(self, result: dice.RollResult, record: hist.Record) -> str:
         parts = []
@@ -690,7 +677,7 @@ class DiceApp(tk.Tk):
                 text=self._breakdown_text(*self._last), fg=MUTED
             )
         else:
-            self.hint_label.configure(text="输入 xDx（例如 3D6），按 Enter 掷骰", fg=DIM)
+            self.hint_label.configure(text="输入 xDx（如 3D6），按 Enter 掷骰", fg=DIM)
 
     # ------------------------------------------------------------ 历史显示
 
@@ -842,6 +829,7 @@ class DiceApp(tk.Tk):
         self._refresh_history()
         self._update_badge()
         self._update_footer()
+        self._refresh_stats_window()
         if archived:
             self._toast("已归档为 " + os.path.basename(archived))
         else:
@@ -862,6 +850,39 @@ class DiceApp(tk.Tk):
             messagebox.showerror("AliDice 出错", f"{exc.__name__}: {val}", parent=self)
         except Exception:
             pass
+
+    # ------------------------------------------------------------ 统计
+
+    def _open_stats(self) -> None:
+        win = self._stats_win
+        if win is not None:
+            try:
+                if win.winfo_exists():
+                    win.refresh()
+                    win.lift()
+                    win.focus_set()
+                    return
+            except tk.TclError:
+                pass
+            self._stats_win = None
+        from stats_view import StatsWindow
+
+        try:
+            self._stats_win = StatsWindow(self, self.store)
+        except tk.TclError as exc:
+            messagebox.showerror("统计", f"无法打开统计窗口：{exc}", parent=self)
+
+    def _refresh_stats_window(self) -> None:
+        win = self._stats_win
+        if win is None:
+            return
+        try:
+            if win.winfo_exists():
+                win.refresh()
+            else:
+                self._stats_win = None
+        except tk.TclError:
+            self._stats_win = None
 
     # ------------------------------------------------------------ 其它
 

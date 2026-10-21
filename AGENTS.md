@@ -9,19 +9,22 @@ AliDice 是一个桌面骰子应用（Python 3.9+ / Tkinter / 纯标准库），
 已落盘的记录不可修改；任何改动都会在打开历史时被校验发现。
 
 - 界面：`app.py`（`DiceApp(tk.Tk)`，深色单窗口）
+- 主题：`theme.py`（配色、分类色、字体选择，两个窗口共用）
 - 掷骰：`dice.py`（解析 + `SystemRandom` 投掷）
 - 历史：`history.py`（二进制格式、HMAC 链、seal、追加句柄、归档）
+- 统计：`stats.py`（`xDy` → `x` 个 `1Dy` 聚合、分箱、占比）、`stats_view.py`
+  （统计窗口：分布表 + Canvas 手绘柱状图 / 饼图）
 - 工具：`verify.py`（只读校验）、`selftest.py`（自测）、`run.bat`（无控制台启动）
 
 ## 常用命令
 
 ```bash
 python app.py                  # 启动界面
-python selftest.py             # 自测，必须 36/36 通过
+python selftest.py             # 自测，必须 52/52 通过
 python verify.py               # 只读校验 data/history.dat
 python verify.py --file data/history-20260510-120000.dat
-python -m pyflakes app.py dice.py history.py selftest.py verify.py
-python -m py_compile app.py dice.py history.py selftest.py verify.py
+python -m pyflakes app.py dice.py history.py stats.py stats_view.py theme.py selftest.py verify.py
+python -m py_compile app.py dice.py history.py stats.py stats_view.py theme.py selftest.py verify.py
 ```
 
 提交前固定跑：`selftest.py` + `pyflakes` + `py_compile`。
@@ -54,6 +57,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - `HistoryStore.append()` 是**唯一**的历史写入口，写入后 `flush()` 并回读最后一条
   MAC 校验；失败则锁定报告。
 - 界面层不直接碰文件，只调用 `store.append()`；历史列表为只读 `ttk.Treeview`。
+- 统计窗口只读 `store.records`（跳过未校验记录），不写任何文件；主窗口掷骰或
+  归档重置后会调用 `StatsWindow.refresh()`。
 
 ## 不可违反的约束
 
@@ -95,15 +100,22 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 改 `dice.py`：补/改表达式合法性与边界用例。
 - 改 `app.py`：至少启动一次并实际掷骰；建议在 920×620 与 1160×740 两种尺寸下检查
   布局（不要提交截图或用例生成的文件）。
+- 改 `stats.py`：`selftest.py` 的“统计聚合”用例必须全过；新增聚合口径要补用例
+  （拆骰、修正值、未校验、分箱、占比之和）。
+- 改 `stats_view.py`：确认柱状图/饼图在 900×600 到 1100×720 下都不裁切图例，
+  悬停提示与分布表数值一致。
 - 新增依赖：不允许。运行时只用标准库（Pillow 仅供本地截图调试，默认不安装）。
 
 ## 编码约定
 
 - 中文注释与中文界面文案；模块/函数 docstring 用中文。
 - 类型注解 + `from __future__ import annotations`；行宽约 100。
-- 颜色、字体、间距常量集中在 `app.py` 顶部；不要把颜色散落到方法里。
+- 颜色、字体常量集中在 `theme.py`（`app.py` 原先的常量已迁走）；图表分类色用
+  `theme.SERIES`，不要写死新的十六进制颜色。
 - `selftest.py` 用 `check(name, cond)` 输出，不引入 pytest。
 - 保持 `pyflakes` 零告警。
+- 统计只读：不要为了统计去改写历史、增加记录字段或改动二进制格式；
+  `stats.py` 只依赖 `dice.parse()` 与 `Record.notation/rolls`。
 
 ## 提交规范
 

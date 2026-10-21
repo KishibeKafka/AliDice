@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """核心逻辑自检：``python selftest.py``。
 
-覆盖：表达式解析、追加入库、重开校验、各种篡改检测、归档重置。
+覆盖：表达式解析、追加入库、重开校验、各种篡改检测、归档重置、统计聚合。
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import tempfile
 
 import dice
 import history
+import stats
 
 
 PASS = 0
@@ -281,6 +282,53 @@ def make_check_seal_tail(sub: str) -> bool:
     return ok
 
 
+def stats_tests() -> None:
+    section("统计聚合")
+
+    def rec(idx, notation, rolls, modifier=0, verified=True):
+        return history.Record(
+            idx, 0, notation, tuple(rolls), modifier, sum(rolls) + modifier, b"", verified
+        )
+
+    records = [
+        rec(0, "3D6", (1, 2, 3)),
+        rec(1, "2D6+1", (6, 6), 1),
+        rec(2, "1D100", (42,)),
+        rec(3, "2D100+1D10", (100, 1, 7)),
+        rec(4, "1D6", (6,), verified=False),
+    ]
+
+    s6 = stats.collect(records, 6)
+    check("3D6 拆成 3 个 1D6", s6.total == 5, s6.total)
+    check("1D6 计数正确", s6.counts == [1, 1, 1, 0, 0, 2], s6.counts)
+    check("修正值不参与统计", s6.counts[5] == 2)
+    check("未校验记录默认跳过", s6.records_unverified == 1)
+    check("可包含未校验记录", stats.collect(records, 6, include_unverified=True).total == 6)
+
+    s100 = stats.collect(records, 100)
+    check("多组拆解只取同面数骰子", s100.total == 3, s100.total)
+    check("最高/最低点计数", s100.counts[99] == 1 and s100.counts[0] == 1)
+
+    check("占比之和为 1", abs(sum(f.ratio for f in s6.faces()) - 1.0) < 1e-9)
+    check("平均值", abs(s6.mean - (1 + 2 + 3 + 6 + 6) / 5) < 1e-9)
+    check("分箱总和等于总数", sum(b.count for b in s100.bins(10)) == s100.total)
+
+    empty = stats.collect([], 100)
+    check("空历史", empty.total == 0 and empty.hottest is None and empty.mean == 0.0)
+
+    bad = stats.collect([rec(0, "??", (1,))], 6)
+    check("无法解析的记录被忽略", bad.total == 0 and bad.records_ignored == 1)
+
+    big = stats.collect([rec(0, "1D1000", (1000,))], 1000)
+    bins = big.bins(100)
+    check("大面数分箱数量", len(bins) == 100, len(bins))
+    check("大面数分箱覆盖完整", bins[0].start == 1 and bins[-1].end == 1000)
+    check("大面数分箱总和", sum(b.count for b in bins) == 1)
+
+    hot = stats.collect([rec(0, "1D6", (6, 6, 6))], 6)
+    check("最常见/最少见点数", hot.hottest.face == 6 and hot.coldest.face == 1)
+
+
 def main() -> int:
     root = tempfile.mkdtemp(prefix="alidice-selftest-")
     try:
@@ -289,6 +337,7 @@ def main() -> int:
         tamper_tests(root)
         reset_tests(root)
         crash_safety_tests(root)
+        stats_tests()
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"\n结果：{PASS} 通过 / {FAIL} 失败")
