@@ -88,6 +88,14 @@ def copy_format_tests() -> None:
     )
     check("空点数", dice.bracket_text("1D100", []) == "[1D100 = 0]")
 
+    check("简版单骰", dice.result_text("1D10", [8]) == "1D10 = 8")
+    check("简版多骰", dice.result_text("2D100", [33, 66]) == "2D100 = 33 + 66 = 99")
+    check(
+        "简版带修正",
+        dice.result_text("2D20+1D8-2", [17, 3, 5], -2)
+        == "2D20+1D8-2 = 17 + 3 + 5 - 2 = 23",
+    )
+
     roll = dice.parse("3D10").roll()
     check(
         "与真实投掷一致",
@@ -373,9 +381,11 @@ def stats_tests() -> None:
     check("修正值不参与统计", s6.counts[5] == 2)
     check("未校验记录默认跳过", s6.records_unverified == 1)
     check("可包含未校验记录", stats.collect(records, 6, include_unverified=True).total == 6)
+    check("matched 记录匹配同面数", [r.index for r in s6.matched] == [0, 1])
 
     s100 = stats.collect(records, 100)
     check("多组拆解只取同面数骰子", s100.total == 3, s100.total)
+    check("matched 包含多组记录", [r.index for r in s100.matched] == [2, 3])
     check("最高/最低点计数", s100.counts[99] == 1 and s100.counts[0] == 1)
 
     check("占比之和为 1", abs(sum(f.ratio for f in s6.faces()) - 1.0) < 1e-9)

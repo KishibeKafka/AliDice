@@ -23,6 +23,7 @@ __all__ = [
     "DiceExpression",
     "RollResult",
     "parse",
+    "result_text",
     "bracket_text",
 ]
 
@@ -101,30 +102,35 @@ class RollResult:
         return " + ".join(parts) + f" = {self.total}"
 
 
-def bracket_text(
-    notation: str, rolls: Sequence[int], modifier: int = 0
-) -> str:
-    """把一次投掷格式化成便于粘贴的文本。
+def result_text(notation: str, rolls: Sequence[int], modifier: int = 0) -> str:
+    """把一次投掷格式化成简短文本（不含方括号）。
 
-    >>> bracket_text("1D100", [67])
-    '[1D100 = 67]'
-    >>> bracket_text("3D10", [3, 6, 9])
-    '[3D10 = 3 + 6 + 9 = 18]'
-    >>> bracket_text("2D20+1D8-2", [17, 3, 5], -2)
-    '[2D20+1D8-2 = 17 + 3 + 5 - 2 = 23]'
+    >>> result_text("1D100", [67])
+    '1D100 = 67'
+    >>> result_text("3D10", [3, 6, 9])
+    '3D10 = 3 + 6 + 9 = 18'
+    >>> result_text("2D20+1D8-2", [17, 3, 5], -2)
+    '2D20+1D8-2 = 17 + 3 + 5 - 2 = 23'
     """
     rolls = list(rolls)
     total = sum(rolls) + modifier
     if not rolls:
-        return f"[{notation} = {total}]"
+        return f"{notation} = {total}"
     if len(rolls) == 1 and not modifier:
-        return f"[{notation} = {total}]"
+        return f"{notation} = {total}"
     expr = " + ".join(str(value) for value in rolls)
     if modifier > 0:
         expr += f" + {modifier}"
     elif modifier < 0:
         expr += f" - {-modifier}"
-    return f"[{notation} = {expr} = {total}]"
+    return f"{notation} = {expr} = {total}"
+
+
+def bracket_text(
+    notation: str, rolls: Sequence[int], modifier: int = 0
+) -> str:
+    """复制到剪贴板用的格式，在 :func:`result_text` 外包一层方括号。"""
+    return f"[{result_text(notation, rolls, modifier)}]"
 
 
 def _canonical(terms: Sequence[DiceTerm], modifier: int) -> str:

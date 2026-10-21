@@ -15,13 +15,14 @@ AliDice 是一个桌面骰子应用（Python 3.9+ / Tkinter / 纯标准库），
 - 统计：`stats.py`（`xDy` → `x` 个 `1Dy` 聚合、分箱、占比）、`stats_view.py`
   （统计窗口：分布表 + Canvas 手绘柱状图 / 饼图）
 - 归档查看：`archive_view.py`（只读打开 `history-*.dat`，显示校验状态与记录）
+- 缩略视图：`chipgrid.py`（Canvas 手绘圆角标签、自动换行、滚动、换肤）
 - 工具：`verify.py`（只读校验）、`selftest.py`（自测）、`run.bat`（无控制台启动）
 
 ## 常用命令
 
 ```bash
 python app.py                  # 启动界面
-python selftest.py             # 自测，必须 69/69 通过
+python selftest.py             # 自测，必须 74/74 通过
 python verify.py               # 只读校验 data/history.dat
 python verify.py --file data/history-20260510-120000.dat
 python -m pyflakes *.py
@@ -62,6 +63,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
   归档重置后会调用 `StatsWindow.refresh()`。
 - 归档查看窗口通过 `HistoryStore.for_file(path)`（`read_only=True`）打开任意
   `history-*.dat`，只展示记录并校验，绝不写文件；主窗口负责在换肤时通知它。
+- 统计/归档窗口各有「表格 / 缩略」视图：缩略模式用 `chipgrid.ChipGrid`，记录文本统一
+  由 `dice.result_text()` 生成（`1D10 = 8`、`2D100 = 33 + 66 = 99`），不要另拼格式。
 - 主题：界面取色一律用 `theme.C.<角色>`（如 `C.bg`），不要写字面量颜色；
   换肤时 `theme.switch()` 就地更新 `C` 并返回“旧色→新色”映射，
   `theme.apply_to_widgets()` 给已有控件重新上色，统计窗口需要再 `_redraw()`。
@@ -109,7 +112,10 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 改 `stats.py`：`selftest.py` 的“统计聚合”用例必须全过；新增聚合口径要补用例
   （拆骰、修正值、未校验、分箱、占比之和）。
 - 改 `stats_view.py`：确认柱状图/饼图在 900×600 到 1100×720 下都不裁切图例，
-  悬停提示与分布表数值一致；亮/暗两套主题下图表都清晰可读。
+  悬停提示与分布表数值一致；亮/暗两套主题下图表都清晰可读；缩略模式的记录块
+  与当前骰子筛选一致（`DieStats.matched`）。
+- 改 `chipgrid.py`：确认缩略标签在 300–1000px 宽度内都能自动换行、不溢出，
+  滚轮可用，换肤后 Canvas 与滚动条颜色都会更新。
 - 改 `theme.py`：`selftest.py` 的“主题”用例必须通过（角色唯一、换肤往返一致），
   并手动切换一次主题确认主窗口、统计窗口、归档窗口都完整换色。
 - 改归档相关功能：`selftest.py` 的“归档文件打开”用例必须通过（`for_file` 只读、

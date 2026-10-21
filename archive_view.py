@@ -12,6 +12,7 @@ import tkinter as tk
 from tkinter import font as tkfont, ttk
 from typing import Dict, Optional
 
+import chipgrid
 import dice
 import history as hist
 import theme
@@ -31,6 +32,7 @@ class ArchiveWindow(tk.Toplevel):
         self._tree_width = 0
         self._col_widths: Dict[str, int] = {}
         self._status_job = None
+        self.view_mode = "table"
 
         self.title("AliDice · 归档")
         self.configure(bg=C.bg)
@@ -66,6 +68,7 @@ class ArchiveWindow(tk.Toplevel):
     def _setup_fonts(self) -> None:
         ui = theme.pick_family(self, theme.UI_FONTS)
         mono = theme.pick_family(self, theme.MONO_FONTS)
+        self.f_chip = tkfont.Font(family=mono, size=9)
         self.f_brand = (ui, 14, "bold")
         self.f_h = (ui, 11, "bold")
         self.f_ui = (ui, 10)
@@ -123,6 +126,15 @@ class ArchiveWindow(tk.Toplevel):
         )
         self.badge.pack(side="right")
 
+        view_box = tk.Frame(head, bg=C.card_alt)
+        view_box.pack(side="right", padx=(0, 8))
+        self.view_chips = {}
+        for mode, label in (("table", "表格"), ("compact", "缩略")):
+            chip = self._view_chip(view_box, label, lambda m=mode: self._set_view(m))
+            chip.pack(side="left", padx=1, pady=1)
+            self.view_chips[mode] = chip
+        self._sync_view_chips()
+
         self.path_label = tk.Label(
             self, text=self.path, bg=C.bg, fg=C.dim, font=self.f_tiny, anchor="w"
         )
@@ -139,7 +151,9 @@ class ArchiveWindow(tk.Toplevel):
         inner = tk.Frame(card, bg=C.card)
         inner.pack(fill="both", expand=True, padx=1, pady=1)
 
-        wrap = tk.Frame(inner, bg=C.card)
+        self.table_frame = tk.Frame(inner, bg=C.card)
+        self.table_frame.pack(fill="both", expand=True)
+        wrap = tk.Frame(self.table_frame, bg=C.card)
         wrap.pack(fill="both", expand=True, padx=(10, 6), pady=(8, 4))
         cols = ("idx", "time", "expr", "rolls", "total")
         headings = {"idx": "#", "time": "时间", "expr": "表达式", "rolls": "点数", "total": "合计"}
@@ -176,6 +190,13 @@ class ArchiveWindow(tk.Toplevel):
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self._apply_tags()
 
+        self.chips = chipgrid.ChipGrid(
+            inner,
+            font=self.f_chip,
+            on_click=self._on_chip_click,
+            empty_text="空归档",
+        )
+
         detail_card = self._card(self)
         detail_card.pack(fill="x", padx=18, pady=(10, 0))
         self.detail = tk.Label(
@@ -198,6 +219,64 @@ class ArchiveWindow(tk.Toplevel):
         self._button(foot, "关闭", self._close).pack(side="right")
         self._button(foot, "复制结果", self._copy_result).pack(side="right", padx=(0, 8))
         self.bind("<Configure>", self._on_resize)
+
+    def _view_chip(self, parent, text, command) -> tk.Button:
+        return tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=C.card_alt,
+            fg=C.muted,
+            activebackground=C.hover,
+            activeforeground=C.fg,
+            relief="flat",
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+            font=self.f_tiny,
+            padx=9,
+            pady=3,
+        )
+
+    def _sync_view_chips(self) -> None:
+        for mode, chip in self.view_chips.items():
+            if mode == self.view_mode:
+                chip.configure(bg=C.selected, fg=C.fg)
+            else:
+                chip.configure(bg=C.card_alt, fg=C.muted)
+
+    def _set_view(self, mode: str) -> None:
+        self.view_mode = mode
+        if mode == "table":
+            self.chips.pack_forget()
+            self.table_frame.pack(fill="both", expand=True)
+        else:
+            self.table_frame.pack_forget()
+            self._fill_chips()
+            self.chips.pack(fill="both", expand=True, padx=(10, 6), pady=(8, 4))
+        self._sync_view_chips()
+
+    def _fill_chips(self) -> None:
+        items = []
+        for rec in reversed(self.store.records[-DISPLAY_LIMIT:]):
+            items.append(
+                {
+                    "text": dice.result_text(rec.notation, rec.rolls, rec.modifier),
+                    "key": rec.index,
+                    "danger": not rec.verified,
+                }
+            )
+        selected = self._detail_record.index if self._detail_record else None
+        self.chips.set_items(items, selected=selected)
+
+    def _on_chip_click(self, key: int) -> None:
+        for rec in self.store.records:
+            if rec.index == key:
+                self._show_record(rec)
+                self.chips.set_selected(key)
+                if str(key) in self._by_iid:
+                    self.tree.selection_set(str(key))
+                return
 
     def _button(self, parent, text, command) -> tk.Button:
         btn = tk.Button(
@@ -281,6 +360,8 @@ class ArchiveWindow(tk.Toplevel):
         self.tree.selection_remove(*self.tree.selection())
         self._update_badge()
         self._update_meta()
+        if self.view_mode == "compact":
+            self._fill_chips()
 
     def _update_badge(self) -> None:
         rep = self.report
@@ -311,8 +392,10 @@ class ArchiveWindow(tk.Toplevel):
         if not sel:
             return
         rec = self._by_iid.get(sel[0])
-        if rec is None:
-            return
+        if rec is not None:
+            self._show_record(rec)
+
+    def _show_record(self, rec: hist.Record) -> None:
         self._detail_record = rec
         rolls = rec.rolls_text or "—"
         if len(rolls) > 220:
@@ -326,12 +409,16 @@ class ArchiveWindow(tk.Toplevel):
             ),
             fg=C.muted if rec.verified else C.danger,
         )
+        chips = getattr(self, "chips", None)
+        if chips is not None:
+            chips.set_selected(rec.index)
 
     def _copy_result(self) -> None:
-        rec = None
-        sel = self.tree.selection()
-        if sel:
-            rec = self._by_iid.get(sel[0])
+        rec = self._detail_record
+        if rec is None:
+            sel = self.tree.selection()
+            if sel:
+                rec = self._by_iid.get(sel[0])
         if rec is None and self.store.records:
             for candidate in reversed(self.store.records):
                 if candidate.verified:
@@ -366,6 +453,9 @@ class ArchiveWindow(tk.Toplevel):
         self._apply_tags()
         self._update_badge()
         self._update_meta()
+        if self.view_mode == "compact":
+            self.chips.apply_theme()
+        self._sync_view_chips()
         self._on_select()
 
     # ------------------------------------------------------------ 关闭

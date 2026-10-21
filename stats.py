@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
 import dice
@@ -46,6 +46,7 @@ class DieStats:
     records_used: int = 0
     records_ignored: int = 0
     records_unverified: int = 0
+    matched: List[history.Record] = field(default_factory=list)
 
     # ------------------------------------------------------------ 基本量
 
@@ -148,5 +149,6 @@ def collect(
                     used = True
         if used:
             stats.records_used += 1
+            stats.matched.append(rec)
 
     return stats

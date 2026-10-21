@@ -12,6 +12,8 @@ import tkinter as tk
 from tkinter import font as tkfont, messagebox, ttk
 from typing import Dict, List, Optional, Tuple
 
+import chipgrid
+import dice
 import history as hist
 import stats as statsmod
 import theme
@@ -19,6 +21,7 @@ from theme import C
 
 MAX_SIDES_UI = 10000
 TABLE_ROW_LIMIT = 1000
+CHIP_LIMIT = 1000
 
 
 def _mix(color_a: str, color_b: str, t: float) -> str:
@@ -48,6 +51,7 @@ class StatsWindow(tk.Toplevel):
         self.store = store
         self.sides = 100
         self.chart_kind = "bar"
+        self.view_mode = "table"
         self.stats: Optional[statsmod.DieStats] = None
         self._bar_hits: List[dict] = []
         self._pie_hits: List[dict] = []
@@ -93,6 +97,7 @@ class StatsWindow(tk.Toplevel):
         self.f_small = (ui, 9)
         self.f_tiny = (ui, 8)
         self.f_mono = (mono, 10)
+        self.f_chip = tkfont.Font(family=mono, size=9)
         self.f_chart = tkfont.Font(family=ui, size=8)
         self.f_pie = tkfont.Font(family=ui, size=8)
 
@@ -207,6 +212,7 @@ class StatsWindow(tk.Toplevel):
 
         body = tk.Frame(self, bg=C.bg)
         body.pack(fill="both", expand=True, padx=18, pady=(12, 0))
+        self.body = body
         body.columnconfigure(0, weight=1)
         body.columnconfigure(1, minsize=300, weight=0)
         body.rowconfigure(0, weight=1)
@@ -236,11 +242,22 @@ class StatsWindow(tk.Toplevel):
         tinner.pack(fill="both", expand=True, padx=1, pady=1)
         thead = tk.Frame(tinner, bg=C.card)
         thead.pack(fill="x", padx=12, pady=(10, 6))
-        tk.Label(thead, text="分布表", bg=C.card, fg=C.fg, font=self.f_h).pack(side="left")
+        self.table_title = tk.Label(thead, text="分布表", bg=C.card, fg=C.fg, font=self.f_h)
+        self.table_title.pack(side="left")
+        view_box = tk.Frame(thead, bg=C.card_alt)
+        view_box.pack(side="right")
+        self.view_chips = {}
+        for mode, label in (("table", "表格"), ("compact", "缩略")):
+            chip = self._view_chip(view_box, label, lambda m=mode: self._set_view(m))
+            chip.pack(side="left", padx=1, pady=1)
+            self.view_chips[mode] = chip
+        self._sync_view_chips()
         self.table_info = tk.Label(thead, text="", bg=C.card, fg=C.dim, font=self.f_tiny)
-        self.table_info.pack(side="right")
+        self.table_info.pack(side="right", padx=(0, 8))
 
-        wrap = tk.Frame(tinner, bg=C.card)
+        self.table_frame = tk.Frame(tinner, bg=C.card)
+        self.table_frame.pack(fill="both", expand=True)
+        wrap = tk.Frame(self.table_frame, bg=C.card)
         wrap.pack(fill="both", expand=True, padx=(10, 8), pady=(0, 10))
         cols = ("face", "count", "pct")
         self.tree = ttk.Treeview(
@@ -265,6 +282,12 @@ class StatsWindow(tk.Toplevel):
         scroll.pack(side="right", fill="y")
         self._configure_tags()
 
+        self.chips = chipgrid.ChipGrid(
+            tinner,
+            font=self.f_chip,
+            empty_text="没有记录",
+        )
+
         foot = tk.Frame(self, bg=C.bg)
         foot.pack(fill="x", padx=18, pady=(10, 12))
         self.summary = tk.Label(
@@ -281,6 +304,66 @@ class StatsWindow(tk.Toplevel):
         self.bind("<Configure>", self._on_window_configure)
         self.bind("<Escape>", lambda e: self.destroy())
 
+    def _view_chip(self, parent, text, command) -> tk.Button:
+        return tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=C.card_alt,
+            fg=C.muted,
+            activebackground=C.hover,
+            activeforeground=C.fg,
+            relief="flat",
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+            font=self.f_tiny,
+            padx=8,
+            pady=2,
+        )
+
+    def _sync_view_chips(self) -> None:
+        for mode, chip in self.view_chips.items():
+            if mode == self.view_mode:
+                chip.configure(bg=C.selected, fg=C.fg)
+            else:
+                chip.configure(bg=C.card_alt, fg=C.muted)
+
+    def _set_view(self, mode: str) -> None:
+        self.view_mode = mode
+        self.table_title.configure(text="记录" if mode == "compact" else "分布表")
+        # 缩略模式给记录块更多横向空间
+        self.body.columnconfigure(1, minsize=380 if mode == "compact" else 300)
+        if mode == "table":
+            self.chips.pack_forget()
+            self.table_frame.pack(fill="both", expand=True)
+            self._update_table()
+        else:
+            self.table_frame.pack_forget()
+            self._fill_chips()
+            self.chips.pack(fill="both", expand=True, padx=(10, 8), pady=(0, 10))
+        self._sync_view_chips()
+
+    def _fill_chips(self) -> None:
+        st = self.stats
+        records = list(reversed(st.matched)) if st is not None else []
+        total = len(records)
+        truncated = total > CHIP_LIMIT
+        if truncated:
+            records = records[:CHIP_LIMIT]
+        items = [
+            {
+                "text": dice.result_text(rec.notation, rec.rolls, rec.modifier),
+                "key": rec.index,
+            }
+            for rec in records
+        ]
+        self.chips.set_items(items)
+        info = f"{total} 条记录"
+        if truncated:
+            info += f" · 显示最近 {CHIP_LIMIT} 条"
+        self.table_info.configure(text=info)
+
     def apply_theme(self, mapping=None) -> None:
         if mapping:
             theme.apply_to_widgets(self, mapping)
@@ -288,6 +371,9 @@ class StatsWindow(tk.Toplevel):
         self._configure_tags()
         self._sync_chips()
         self._update_table()
+        if self.view_mode == "compact":
+            self.chips.apply_theme()
+            self._fill_chips()
         self._update_summary()
         self._redraw()
 
@@ -373,6 +459,9 @@ class StatsWindow(tk.Toplevel):
         )
         self._sync_chips()
         self._update_table()
+        if self.view_mode == "compact":
+            self.chips.apply_theme()
+            self._fill_chips()
         self._update_summary()
         self._redraw()
 
@@ -550,7 +639,8 @@ class StatsWindow(tk.Toplevel):
             pad_l, pad_t + plot_h, width - pad_r, pad_t + plot_h, fill=C.border
         )
 
-        step = max(1, math.ceil(len(bins) / 12))
+        max_labels = max(3, int(plot_w // 44))
+        step = max(1, math.ceil(len(bins) / max_labels))
         for i in range(0, len(bins), step):
             cx = pad_l + (i + 0.5) * slot
             self.canvas.create_text(
