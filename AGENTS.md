@@ -14,17 +14,18 @@ AliDice 是一个桌面骰子应用（Python 3.9+ / Tkinter / 纯标准库），
 - 历史：`history.py`（二进制格式、HMAC 链、seal、追加句柄、归档）
 - 统计：`stats.py`（`xDy` → `x` 个 `1Dy` 聚合、分箱、占比）、`stats_view.py`
   （统计窗口：分布表 + Canvas 手绘柱状图 / 饼图）
+- 归档查看：`archive_view.py`（只读打开 `history-*.dat`，显示校验状态与记录）
 - 工具：`verify.py`（只读校验）、`selftest.py`（自测）、`run.bat`（无控制台启动）
 
 ## 常用命令
 
 ```bash
 python app.py                  # 启动界面
-python selftest.py             # 自测，必须 64/64 通过
+python selftest.py             # 自测，必须 69/69 通过
 python verify.py               # 只读校验 data/history.dat
 python verify.py --file data/history-20260510-120000.dat
-python -m pyflakes app.py dice.py history.py stats.py stats_view.py theme.py selftest.py verify.py
-python -m py_compile app.py dice.py history.py stats.py stats_view.py theme.py selftest.py verify.py
+python -m pyflakes *.py
+python -m py_compile *.py
 ```
 
 提交前固定跑：`selftest.py` + `pyflakes` + `py_compile`。
@@ -59,6 +60,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 界面层不直接碰文件，只调用 `store.append()`；历史列表为只读 `ttk.Treeview`。
 - 统计窗口只读 `store.records`（跳过未校验记录），不写任何文件；主窗口掷骰或
   归档重置后会调用 `StatsWindow.refresh()`。
+- 归档查看窗口通过 `HistoryStore.for_file(path)`（`read_only=True`）打开任意
+  `history-*.dat`，只展示记录并校验，绝不写文件；主窗口负责在换肤时通知它。
 - 主题：界面取色一律用 `theme.C.<角色>`（如 `C.bg`），不要写字面量颜色；
   换肤时 `theme.switch()` 就地更新 `C` 并返回“旧色→新色”映射，
   `theme.apply_to_widgets()` 给已有控件重新上色，统计窗口需要再 `_redraw()`。
@@ -108,7 +111,9 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 改 `stats_view.py`：确认柱状图/饼图在 900×600 到 1100×720 下都不裁切图例，
   悬停提示与分布表数值一致；亮/暗两套主题下图表都清晰可读。
 - 改 `theme.py`：`selftest.py` 的“主题”用例必须通过（角色唯一、换肤往返一致），
-  并手动切换一次主题确认两个窗口都完整换色。
+  并手动切换一次主题确认主窗口、统计窗口、归档窗口都完整换色。
+- 改归档相关功能：`selftest.py` 的“归档文件打开”用例必须通过（`for_file` 只读、
+  归档改动可检测），并确认打开归档不会修改文件或新建 seal。
 - 新增依赖：不允许。运行时只用标准库（Pillow 仅供本地截图调试，默认不安装）。
 
 ## 编码约定
@@ -119,8 +124,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
   `C.series`，不要写死新的十六进制颜色。
 - 新增配色角色时必须让两套主题内**各角色颜色互不相同**（重复会导致换肤映射歧义，
   `selftest.py` 的“主题”用例会检查）；同时补齐 `apply_to_widgets` 依赖的颜色选项。
-- 独立 `Toplevel`（统计窗口）由自身 `apply_theme()` 换肤，`theme._walk` 不会递归进去，
-  避免同一映射被应用两次。
+- 独立 `Toplevel`（统计、归档窗口）由自身 `apply_theme()` 换肤，`theme._walk` 不会
+  递归进去，避免同一映射被应用两次；主窗口 `_apply_theme()` 负责逐个通知。
 - `selftest.py` 用 `check(name, cond)` 输出，不引入 pytest。
 - 保持 `pyflakes` 零告警。
 - 统计只读：不要为了统计去改写历史、增加记录字段或改动二进制格式；

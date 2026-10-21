@@ -122,15 +122,7 @@ class StatsWindow(tk.Toplevel):
         )
         style.map("Stats.Treeview", background=[("selected", C.selected)])
         style.map("Stats.Treeview.Heading", background=[("active", C.card_alt)])
-        style.configure(
-            "Stats.Vertical.TScrollbar",
-            background=C.card_alt,
-            troughcolor=C.bg,
-            bordercolor=C.bg,
-            arrowcolor=C.muted,
-            relief="flat",
-            width=10,
-        )
+        theme.configure_scrollbar(style, "Stats.Vertical.TScrollbar")
 
     def _card(self, master) -> tk.Frame:
         return tk.Frame(

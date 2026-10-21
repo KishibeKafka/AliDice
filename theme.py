@@ -180,6 +180,30 @@ def switch(name: str) -> Dict[str, str]:
     return mapping
 
 
+def configure_scrollbar(style, name: str) -> None:
+    """统一暗/亮主题下滚动条的滑块、槽与禁用状态颜色。"""
+    style.configure(
+        name,
+        background=C.card_alt,
+        troughcolor=C.bg,
+        bordercolor=C.bg,
+        lightcolor=C.card_alt,
+        darkcolor=C.card_alt,
+        arrowcolor=C.muted,
+        relief="flat",
+        width=10,
+    )
+    style.map(
+        name,
+        background=[
+            ("disabled", C.border),
+            ("active", C.hover),
+            ("pressed", C.card_alt),
+        ],
+        arrowcolor=[("disabled", C.dim), ("active", C.fg)],
+    )
+
+
 # 可重新上色的控件选项
 _COLOR_OPTIONS = (
     "background",

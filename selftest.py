@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """核心逻辑自检：``python selftest.py``。
 
-覆盖：表达式解析、复制格式、追加入库、重开校验、各种篡改检测、归档重置、统计聚合、主题。
+覆盖：表达式解析、复制格式、追加入库、重开校验、各种篡改检测、归档重置、
+归档文件读取、统计聚合、主题。
 """
 
 from __future__ import annotations
@@ -272,6 +273,46 @@ def reset_tests(root: str) -> None:
     ro.close()
 
 
+def archive_file_tests(root: str) -> None:
+    section("归档文件打开")
+
+    sub = os.path.join(root, "a1")
+    store = make_store(sub)
+    store.open()
+    store.append("1D100", [88])
+    store.append("3D6", [1, 2, 3])
+    archived = store.archive_and_reset()
+    store.close()
+
+    keys = os.path.join(sub, "keys")
+    ro = history.HistoryStore.for_file(archived, key_path=keys)
+    rep = ro.open()
+    check(
+        "for_file 校验通过",
+        rep.state == history.STATE_OK and rep.record_count == 2,
+        rep.message,
+    )
+    check("for_file 只读", not ro.can_append)
+    check("归档点数可读", ro.records[1].rolls == (1, 2, 3))
+    ro.close()
+
+    missing = history.HistoryStore.for_file(
+        os.path.join(sub, "data", "nope.dat"), key_path=keys
+    )
+    rep2 = missing.open()
+    check("缺失文件报告异常", rep2.state == history.STATE_TAMPERED, rep2.message)
+    missing.close()
+
+    # 归档文件被改动后同样能被发现
+    raw = bytearray(open(archived, "rb").read())
+    raw[history.FILE_HEADER_SIZE + history.REC_HEADER_SIZE + 6] ^= 0x7F
+    open(archived, "wb").write(raw)
+    broken = history.HistoryStore.for_file(archived, key_path=keys)
+    rep3 = broken.open()
+    check("归档改动可检测", rep3.state == history.STATE_TAMPERED, rep3.message)
+    broken.close()
+
+
 def crash_safety_tests(root: str) -> None:
     section("seal 落后自动追平")
     sub = os.path.join(root, "c1")
@@ -398,6 +439,7 @@ def main() -> int:
         basic_flow(root)
         tamper_tests(root)
         reset_tests(root)
+        archive_file_tests(root)
         crash_safety_tests(root)
         stats_tests()
         theme_tests()

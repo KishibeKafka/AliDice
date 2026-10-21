@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 
 import history as hist
@@ -26,10 +25,10 @@ def main(argv=None) -> int:
     parser.add_argument("--tail", type=int, default=20, help="打印最近 N 条，0 表示全部")
     args = parser.parse_args(argv)
 
-    store = hist.HistoryStore(data_dir=args.data_dir, read_only=True)
     if args.file:
-        store.data_dir = os.path.dirname(os.path.abspath(args.file))
-        store.path = os.path.abspath(args.file)
+        store = hist.HistoryStore.for_file(args.file)
+    else:
+        store = hist.HistoryStore(data_dir=args.data_dir, read_only=True)
     report = store.open()
 
     print(f"文件  : {store.path}")

@@ -14,7 +14,7 @@ import random
 import sys
 import time
 import tkinter as tk
-from tkinter import font as tkfont, messagebox, simpledialog, ttk
+from tkinter import filedialog, font as tkfont, messagebox, simpledialog, ttk
 from typing import List, Optional, Tuple
 
 import dice
@@ -103,6 +103,7 @@ class DiceApp(tk.Tk):
         self._toast_job = None
         self._detail_record: Optional[hist.Record] = None
         self._stats_win = None
+        self._archive_wins: List[tk.Toplevel] = []
 
         self.title("AliDice · 骰子")
         self.configure(bg=C.bg)
@@ -134,6 +135,7 @@ class DiceApp(tk.Tk):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
         self.bind("<Control-t>", lambda e: self._open_stats())
+        self.bind("<Control-o>", lambda e: self._open_archive())
 
         if not self.store.report.can_append:
             self.after(400, self._show_integrity_notice)
@@ -187,16 +189,7 @@ class DiceApp(tk.Tk):
             foreground=[("selected", C.selected_fg)],
         )
         style.map("Ali.Treeview.Heading", background=[("active", C.card_alt)])
-        style.configure(
-            "Ali.Vertical.TScrollbar",
-            background=C.card_alt,
-            troughcolor=C.bg,
-            bordercolor=C.bg,
-            arrowcolor=C.muted,
-            relief="flat",
-            width=10,
-        )
-        style.map("Ali.Vertical.TScrollbar", background=[("active", C.border)])
+        theme.configure_scrollbar(style, "Ali.Vertical.TScrollbar")
 
     def _button(self, parent, text, command, kind="ghost", font=None, padx=14, pady=7):
         spec = {
@@ -252,6 +245,13 @@ class DiceApp(tk.Tk):
                     self._stats_win = None
             except tk.TclError:
                 self._stats_win = None
+        for archive in list(self._archive_wins):
+            try:
+                if archive.winfo_exists():
+                    archive.apply_theme(mapping)
+            except tk.TclError:
+                pass
+        self._prune_archive_wins()
         save_theme(name)
 
     def _apply_tree_tags(self) -> None:
@@ -477,6 +477,9 @@ class DiceApp(tk.Tk):
             side="right", padx=(0, 8)
         )
         self._button(bar, "统计图表", self._open_stats, kind="ghost", pady=5, padx=12).pack(
+            side="right", padx=(0, 8)
+        )
+        self._button(bar, "打开归档", self._open_archive, kind="ghost", pady=5, padx=12).pack(
             side="right", padx=(0, 8)
         )
         self.status_label.pack(side="left", fill="x", expand=True)
@@ -918,6 +921,38 @@ class DiceApp(tk.Tk):
             self._stats_win = StatsWindow(self, self.store)
         except tk.TclError as exc:
             messagebox.showerror("统计", f"无法打开统计窗口：{exc}", parent=self)
+
+    def _open_archive(self) -> None:
+        start = hist.default_data_dir()
+        if not os.path.isdir(start):
+            start = hist.project_dir()
+        path = filedialog.askopenfilename(
+            parent=self,
+            title="打开归档历史",
+            initialdir=start,
+            filetypes=(("AliDice 历史文件", "*.dat"), ("所有文件", "*.*")),
+        )
+        if not path:
+            return
+        from archive_view import ArchiveWindow
+
+        try:
+            win = ArchiveWindow(self, path)
+        except (OSError, hist.HistoryError, tk.TclError) as exc:
+            messagebox.showerror("打开归档", f"无法打开：\n{exc}", parent=self)
+            return
+        win.bind("<Destroy>", lambda e: self._prune_archive_wins(), add="+")
+        self._archive_wins.append(win)
+
+    def _prune_archive_wins(self) -> None:
+        alive = []
+        for win in self._archive_wins:
+            try:
+                if win.winfo_exists():
+                    alive.append(win)
+            except tk.TclError:
+                continue
+        self._archive_wins = alive
 
     def _refresh_stats_window(self) -> None:
         win = self._stats_win

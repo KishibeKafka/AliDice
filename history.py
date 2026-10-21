@@ -470,6 +470,18 @@ class HistoryStore:
         self.report = Report()
         self._total_size = 0
 
+    @classmethod
+    def for_file(
+        cls, path: str, read_only: bool = True, key_path: Optional[str] = None
+    ) -> "HistoryStore":
+        """打开任意一个历史文件（例如归档的 history-*.dat），默认只读。"""
+        path = os.path.abspath(path)
+        store = cls(
+            data_dir=os.path.dirname(path) or ".", key_path=key_path, read_only=read_only
+        )
+        store.path = path
+        return store
+
     # ------------------------------------------------------------ 密钥
 
     def _load_secret(self) -> None:
