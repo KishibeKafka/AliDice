@@ -140,6 +140,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 类型注解 + `from __future__ import annotations`；行宽约 100。
 - 颜色、字体常量集中在 `theme.py`，界面通过 `theme.C` 动态取色；图表分类色用
   `C.series`，不要写死新的十六进制颜色。
+- 事件回调（悬停、点击、重绘）里必须**实时**读取 `theme.C`，不要捕获创建控件时的
+  颜色值：换肤后旧闭包会把亮色主题的按钮悬停成深色（此前的“悬停变黑”即因此产生）。
 - 新增配色角色时必须让两套主题内**各角色颜色互不相同**（重复会导致换肤映射歧义，
   `selftest.py` 的“主题”用例会检查）；同时补齐 `apply_to_widgets` 依赖的颜色选项。
 - 独立 `Toplevel`（统计、归档窗口）由自身 `apply_theme()` 换肤，`theme._walk` 不会

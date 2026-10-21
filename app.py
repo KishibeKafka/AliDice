@@ -191,21 +191,23 @@ class DiceApp(tk.Tk):
         style.map("Ali.Treeview.Heading", background=[("active", C.card_alt)])
         theme.configure_scrollbar(style, "Ali.Vertical.TScrollbar")
 
+    _BUTTON_ROLES = {
+        "accent": ("accent", "accent_text", "accent_hover"),
+        "ghost": ("card_alt", "fg", "hover"),
+        "chip": ("field", "blue", "hover"),
+        "danger": ("danger_bg", "danger", "hover"),
+    }
+
     def _button(self, parent, text, command, kind="ghost", font=None, padx=14, pady=7):
-        spec = {
-            "accent": (C.accent, C.accent_text, C.accent_hover),
-            "ghost": (C.card_alt, C.fg, C.hover),
-            "chip": (C.field, C.blue, C.hover),
-            "danger": (C.danger_bg, C.danger, C.hover),
-        }[kind]
+        bg_role, fg_role, hover_role = self._BUTTON_ROLES[kind]
         btn = tk.Button(
             parent,
             text=text,
             command=command,
-            bg=spec[0],
-            fg=spec[1],
-            activebackground=spec[2],
-            activeforeground=spec[1],
+            bg=getattr(C, bg_role),
+            fg=getattr(C, fg_role),
+            activebackground=getattr(C, hover_role),
+            activeforeground=getattr(C, fg_role),
             relief="flat",
             bd=0,
             highlightthickness=0,
@@ -214,9 +216,18 @@ class DiceApp(tk.Tk):
             padx=padx,
             pady=pady,
         )
-        btn.bind("<Enter>", lambda e: btn.configure(bg=spec[2]) if str(btn["state"]) == "normal" else None)
-        btn.bind("<Leave>", lambda e: btn.configure(bg=spec[0]) if str(btn["state"]) == "normal" else None)
+        # 悬停时按当前主题取色：换肤后不能沿用创建时捕获的旧颜色
+        btn.bind("<Enter>", lambda e, b=btn, r=hover_role: self._hover_button(b, r))
+        btn.bind("<Leave>", lambda e, b=btn, r=bg_role: self._hover_button(b, r))
         return btn
+
+    def _hover_button(self, button: tk.Button, role: str) -> None:
+        if str(button["state"]) != "normal":
+            return
+        try:
+            button.configure(bg=getattr(C, role))
+        except tk.TclError:
+            pass
 
     def _sync_theme_chips(self) -> None:
         active = theme.current()
