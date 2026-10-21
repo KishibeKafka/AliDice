@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """核心逻辑自检：``python selftest.py``。
 
-覆盖：表达式解析、追加入库、重开校验、各种篡改检测、归档重置、统计聚合。
+覆盖：表达式解析、复制格式、追加入库、重开校验、各种篡改检测、归档重置、统计聚合。
 """
 
 from __future__ import annotations
@@ -67,6 +67,33 @@ def _err(text: str) -> bool:
     except dice.DiceError:
         return True
     return False
+
+
+def copy_format_tests() -> None:
+    section("复制格式")
+
+    check("单骰", dice.bracket_text("1D100", [67]) == "[1D100 = 67]")
+    check("单骰 1D10", dice.bracket_text("1D10", [1]) == "[1D10 = 1]")
+    check("多骰", dice.bracket_text("3D10", [3, 6, 9]) == "[3D10 = 3 + 6 + 9 = 18]")
+    check(
+        "多骰带修正",
+        dice.bracket_text("2D20+1D8-2", [17, 3, 5], -2)
+        == "[2D20+1D8-2 = 17 + 3 + 5 - 2 = 23]",
+    )
+    check(
+        "单骰带修正",
+        dice.bracket_text("1D100+5", [95], 5) == "[1D100+5 = 95 + 5 = 100]",
+    )
+    check("空点数", dice.bracket_text("1D100", []) == "[1D100 = 0]")
+
+    roll = dice.parse("3D10").roll()
+    check(
+        "与真实投掷一致",
+        dice.bracket_text(roll.notation, roll.rolls, roll.modifier)
+        == f"[{' + '.join(str(v) for v in roll.rolls)} = {roll.total}]".replace(
+            "[", "[3D10 = ", 1
+        ),
+    )
 
 
 def basic_flow(root: str) -> None:
@@ -333,6 +360,7 @@ def main() -> int:
     root = tempfile.mkdtemp(prefix="alidice-selftest-")
     try:
         expr_tests()
+        copy_format_tests()
         basic_flow(root)
         tamper_tests(root)
         reset_tests(root)

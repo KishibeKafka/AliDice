@@ -887,19 +887,27 @@ class DiceApp(tk.Tk):
     # ------------------------------------------------------------ 其它
 
     def _copy_result(self) -> None:
-        rec = self._detail_record if self.tree.selection() else None
+        rec = None
+        sel = self.tree.selection()
+        if sel:
+            rec = self._by_iid.get(sel[0])
         if rec is None and self._last:
             rec = self._last[1]
         if rec is None:
+            for candidate in reversed(self.store.records):
+                if candidate.verified:
+                    rec = candidate
+                    break
+        if rec is None:
             self._toast("还没有可复制的结果")
             return
-        text = (
-            f"{rec.time_text}  {rec.notation} = {rec.total}"
-            f"  [{rec.rolls_text}]"
-        )
+        if not rec.verified and not rec.rolls:
+            self._toast("该记录未通过校验，无法复制")
+            return
+        text = dice.bracket_text(rec.notation, rec.rolls, rec.modifier)
         self.clipboard_clear()
         self.clipboard_append(text)
-        self._toast("结果已复制到剪贴板")
+        self._toast(f"已复制 {text}")
 
     def _toast(self, message: str) -> None:
         if self._toast_job is not None:

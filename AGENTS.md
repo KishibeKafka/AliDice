@@ -20,7 +20,7 @@ AliDice 是一个桌面骰子应用（Python 3.9+ / Tkinter / 纯标准库），
 
 ```bash
 python app.py                  # 启动界面
-python selftest.py             # 自测，必须 52/52 通过
+python selftest.py             # 自测，必须 59/59 通过
 python verify.py               # 只读校验 data/history.dat
 python verify.py --file data/history-20260510-120000.dat
 python -m pyflakes app.py dice.py history.py stats.py stats_view.py theme.py selftest.py verify.py
@@ -116,6 +116,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
 - 保持 `pyflakes` 零告警。
 - 统计只读：不要为了统计去改写历史、增加记录字段或改动二进制格式；
   `stats.py` 只依赖 `dice.parse()` 与 `Record.notation/rolls`。
+- 复制文本统一走 `dice.bracket_text()`（`[3D10 = 3 + 6 + 9 = 18]`），不要在界面里
+  另拼一套格式。
 
 ## 提交规范
 
