@@ -257,15 +257,7 @@ class ArchiveWindow(tk.Toplevel):
         self._sync_view_chips()
 
     def _fill_chips(self) -> None:
-        items = []
-        for rec in reversed(self.store.records[-DISPLAY_LIMIT:]):
-            items.append(
-                {
-                    "text": dice.result_text(rec.notation, rec.rolls, rec.modifier),
-                    "key": rec.index,
-                    "danger": not rec.verified,
-                }
-            )
+        items = chipgrid.record_items(self.store.records, DISPLAY_LIMIT)
         selected = self._detail_record.index if self._detail_record else None
         self.chips.set_items(items, selected=selected)
 

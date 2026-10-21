@@ -13,7 +13,6 @@ from tkinter import font as tkfont, messagebox, ttk
 from typing import Dict, List, Optional, Tuple
 
 import chipgrid
-import dice
 import history as hist
 import stats as statsmod
 import theme
@@ -345,19 +344,11 @@ class StatsWindow(tk.Toplevel):
         self._sync_view_chips()
 
     def _fill_chips(self) -> None:
-        # 缩略模式展示全部已校验历史记录，不按当前选中的骰子过滤
-        records = [rec for rec in reversed(self.store.records) if rec.verified]
-        total = len(records)
+        # 缩略模式展示全部已校验历史记录，不按当前选中的骰子过滤；按时间从旧到新排列
+        verified = [rec for rec in self.store.records if rec.verified]
+        total = len(verified)
         truncated = total > CHIP_LIMIT
-        if truncated:
-            records = records[:CHIP_LIMIT]
-        items = [
-            {
-                "text": dice.result_text(rec.notation, rec.rolls, rec.modifier),
-                "key": rec.index,
-            }
-            for rec in records
-        ]
+        items = chipgrid.record_items(verified, CHIP_LIMIT)
         self.chips.set_items(items)
         info = f"{total} 条记录 · 全部骰子"
         if truncated:

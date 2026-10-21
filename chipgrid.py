@@ -12,12 +12,26 @@ import tkinter as tk
 from tkinter import font as tkfont, ttk
 from typing import Callable, List, Optional
 
+import dice
 import theme
 from theme import C
 
 PAD_X = 10
 PAD_Y = 4
 GAP = 7
+
+
+def record_items(records, limit=None):
+    """把记录转换成缩略标签项：按时间从旧到新，超出上限时保留最近 limit 条。"""
+    selected = list(records[-limit:]) if limit else list(records)
+    return [
+        {
+            "text": dice.result_text(rec.notation, rec.rolls, rec.modifier),
+            "key": rec.index,
+            "danger": not rec.verified,
+        }
+        for rec in selected
+    ]
 
 
 def _round_rect(canvas: tk.Canvas, x1: float, y1: float, x2: float, y2: float, **kwargs):

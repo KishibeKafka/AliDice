@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """核心逻辑自检：``python selftest.py``。
 
-覆盖：表达式解析、复制格式、大成功判定、负值合计、追加入库、重开校验、各种篡改检测、归档重置、
+覆盖：表达式解析、复制格式、大成功判定、缩略排序、负值合计、追加入库、重开校验、各种篡改检测、归档重置、
 归档文件读取、统计聚合、主题。
 """
 
@@ -13,6 +13,7 @@ import struct
 import sys
 import tempfile
 
+import chipgrid
 import dice
 import history
 import stats
@@ -136,6 +137,19 @@ def negative_total_tests(root: str) -> None:
         "非负合计编码与旧格式一致",
         struct.pack("<q", 87) == struct.pack("<Q", 87),
     )
+
+
+def chip_order_tests() -> None:
+    section("缩略排序")
+
+    records = [
+        history.Record(i, 0, "1D10", (i + 1,), 0, i + 1, b"", True) for i in range(5)
+    ]
+    items = chipgrid.record_items(records)
+    check("缩略模式上旧下新", [it["key"] for it in items] == [0, 1, 2, 3, 4])
+    items2 = chipgrid.record_items(records, limit=3)
+    check("保留最近记录且顺序不变", [it["key"] for it in items2] == [2, 3, 4])
+    check("缩略文本格式", items2[0]["text"] == "1D10 = 3")
 
 
 def crit_tests() -> None:
@@ -498,6 +512,7 @@ def main() -> int:
         expr_tests()
         copy_format_tests()
         crit_tests()
+        chip_order_tests()
         negative_total_tests(root)
         basic_flow(root)
         tamper_tests(root)
