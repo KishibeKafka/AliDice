@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """核心逻辑自检：``python selftest.py``。
 
-覆盖：表达式解析、复制格式、追加入库、重开校验、各种篡改检测、归档重置、
+覆盖：表达式解析、复制格式、大成功判定、追加入库、重开校验、各种篡改检测、归档重置、
 归档文件读取、统计聚合、主题。
 """
 
@@ -103,6 +103,25 @@ def copy_format_tests() -> None:
         == f"[{' + '.join(str(v) for v in roll.rolls)} = {roll.total}]".replace(
             "[", "[3D10 = ", 1
         ),
+    )
+
+
+def crit_tests() -> None:
+    section("大成功判定")
+
+    check("1D100 96 大成功", dice.crit_kind(96, 100) == dice.CRIT_SUCCESS)
+    check("1D100 100 大成功", dice.crit_kind(100, 100) == dice.CRIT_SUCCESS)
+    check("1D100 95 普通", dice.crit_kind(95, 100) == "")
+    check("1D100 5 大失败", dice.crit_kind(5, 100) == dice.CRIT_FAILURE)
+    check("1D100 6 普通", dice.crit_kind(6, 100) == "")
+    check("1D20 19/20 大成功", all(dice.crit_kind(v, 20) == dice.CRIT_SUCCESS for v in (19, 20)))
+    check("1D20 1 大失败", dice.crit_kind(1, 20) == dice.CRIT_FAILURE)
+    check("1D6 6 大成功", dice.crit_kind(6, 6) == dice.CRIT_SUCCESS)
+    check("1D10 1 不是大失败", dice.crit_kind(1, 10) == "")
+    check(
+        "1D1000 按比例",
+        dice.crit_kind(50, 1000) == dice.CRIT_FAILURE
+        and dice.crit_kind(950, 1000) == dice.CRIT_SUCCESS,
     )
 
 
@@ -446,6 +465,7 @@ def main() -> int:
     try:
         expr_tests()
         copy_format_tests()
+        crit_tests()
         basic_flow(root)
         tamper_tests(root)
         reset_tests(root)

@@ -34,6 +34,10 @@ class Palette:
     gold: str
     danger: str
     danger_bg: str
+    crit_ok: str
+    crit_ok_bg: str
+    crit_bad: str
+    crit_bad_bg: str
     ok_bg: str
     warn_bg: str
     selected: str
@@ -64,6 +68,10 @@ DARK = Palette(
     gold="#ffcf6b",
     danger="#ff6b6b",
     danger_bg="#3a1f24",
+    crit_ok="#3ef58a",
+    crit_ok_bg="#123524",
+    crit_bad="#ff4d4f",
+    crit_bad_bg="#3a1418",
     ok_bg="#17362c",
     warn_bg="#3a3021",
     selected="#2c3a55",
@@ -107,6 +115,10 @@ LIGHT = Palette(
     gold="#a96b10",
     danger="#c0392b",
     danger_bg="#fdecea",
+    crit_ok="#0a8f3c",
+    crit_ok_bg="#d8f3e3",
+    crit_bad="#dc2626",
+    crit_bad_bg="#ffe3e3",
     ok_bg="#e4f5ec",
     warn_bg="#fdf3df",
     selected="#dbe7ff",

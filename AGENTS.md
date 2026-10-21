@@ -22,7 +22,7 @@ AliDice 是一个桌面骰子应用（Python 3.9+ / Tkinter / 纯标准库），
 
 ```bash
 python app.py                  # 启动界面
-python selftest.py             # 自测，必须 74/74 通过
+python selftest.py             # 自测，必须 84/84 通过
 python verify.py               # 只读校验 data/history.dat
 python verify.py --file data/history-20260510-120000.dat
 python -m pyflakes *.py
@@ -65,6 +65,9 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
   `history-*.dat`，只展示记录并校验，绝不写文件；主窗口负责在换肤时通知它。
 - 统计/归档窗口各有「表格 / 缩略」视图：缩略模式用 `chipgrid.ChipGrid`，记录文本统一
   由 `dice.result_text()` 生成（`1D10 = 8`、`2D100 = 33 + 66 = 99`），不要另拼格式。
+- 大成功/大失败判定只允许在 `dice.crit_kind()` 里：1D100 为 96–100 / 1–5，其它骰子按
+  ≥95% / ≤5% 面数比例；界面只在 `app.py` 用 `C.crit_ok` / `C.crit_bad` 着色，
+  多颗骰只标记逐颗点数，合计保持金色。
 - 主题：界面取色一律用 `theme.C.<角色>`（如 `C.bg`），不要写字面量颜色；
   换肤时 `theme.switch()` 就地更新 `C` 并返回“旧色→新色”映射，
   `theme.apply_to_widgets()` 给已有控件重新上色，统计窗口需要再 `_redraw()`。
@@ -111,6 +114,8 @@ app.py ──dice.parse()──> DiceExpression ──roll()──> RollResult
   布局（不要提交截图或用例生成的文件）。
 - 改 `stats.py`：`selftest.py` 的“统计聚合”用例必须全过；新增聚合口径要补用例
   （拆骰、修正值、未校验、分箱、占比之和）。
+- 改 `dice.py` 的判定阈值：`selftest.py` 的“大成功判定”用例必须覆盖 1D100 的
+  95/96、5/6 边界，以及 1D20、1D10、1D6、1D1000 的比例边界。
 - 改 `stats_view.py`：确认柱状图/饼图在 900×600 到 1100×720 下都不裁切图例，
   悬停提示与分布表数值一致；亮/暗两套主题下图表都清晰可读；缩略模式的记录块
   与当前骰子筛选一致（`DieStats.matched`）。

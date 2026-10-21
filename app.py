@@ -596,7 +596,7 @@ class DiceApp(tk.Tk):
         self.roll_btn.configure(
             state="normal", bg=C.accent, fg=C.accent_text
         )
-        self.total_label.configure(text=str(result.total), fg=C.gold)
+        self.total_label.configure(text=str(result.total), fg=self._crit_color(result))
         self.expr_label.configure(text=result.notation)
         self.hint_label.configure(text=self._breakdown_text(result, record), fg=C.muted)
         self._set_chips(result)
@@ -605,6 +605,22 @@ class DiceApp(tk.Tk):
         self._update_badge()
         self._update_footer()
         self._refresh_stats_window()
+
+    @staticmethod
+    def _result_crit(result: dice.RollResult) -> str:
+        """单颗骰才判定大成功/大失败；多颗骰只看单颗点数。"""
+        if len(result.rolls) != 1:
+            return ""
+        term = result.groups[0][0]
+        return dice.crit_kind(result.rolls[0], term.sides)
+
+    def _crit_color(self, result: dice.RollResult) -> str:
+        crit = self._result_crit(result)
+        if crit == dice.CRIT_SUCCESS:
+            return C.crit_ok
+        if crit == dice.CRIT_FAILURE:
+            return C.crit_bad
+        return C.gold
 
     def _breakdown_text(self, result: dice.RollResult, record: hist.Record) -> str:
         parts = []
@@ -626,10 +642,11 @@ class DiceApp(tk.Tk):
                 for value in values:
                     if len(items) >= limit:
                         break
-                    if value == term.sides:
-                        items.append((str(value), C.chip_max_bg, C.gold))
-                    elif value == 1:
-                        items.append((str(value), C.chip_min_bg, C.danger))
+                    crit = dice.crit_kind(value, term.sides)
+                    if crit == dice.CRIT_SUCCESS:
+                        items.append((str(value), C.crit_ok_bg, C.crit_ok))
+                    elif crit == dice.CRIT_FAILURE:
+                        items.append((str(value), C.crit_bad_bg, C.crit_bad))
                     else:
                         items.append((str(value), C.field, C.fg))
                 if len(items) >= limit:

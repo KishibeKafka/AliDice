@@ -25,7 +25,13 @@ __all__ = [
     "parse",
     "result_text",
     "bracket_text",
+    "crit_kind",
+    "CRIT_SUCCESS",
+    "CRIT_FAILURE",
 ]
+
+CRIT_SUCCESS = "success"
+CRIT_FAILURE = "failure"
 
 MAX_DICE_PER_TERM = 1000
 MAX_TOTAL_DICE = 1000
@@ -100,6 +106,28 @@ class RollResult:
         if self.modifier:
             parts.append(f"{self.modifier:+d}")
         return " + ".join(parts) + f" = {self.total}"
+
+
+def crit_kind(value: int, sides: int) -> str:
+    """判定单颗点数是大成功、大失败还是普通。
+
+    1D100 固定为 96–100 大成功、1–5 大失败；其它骰子按点数占面数的比例：
+    >=95% 大成功，<=5% 大失败（例如 1D20 的 20 / 1，1D6 的 6）。
+    """
+    if sides <= 0 or value <= 0:
+        return ""
+    if sides == 100:
+        if value >= 96:
+            return CRIT_SUCCESS
+        if value <= 5:
+            return CRIT_FAILURE
+        return ""
+    ratio = value / sides
+    if ratio >= 0.95:
+        return CRIT_SUCCESS
+    if ratio <= 0.05:
+        return CRIT_FAILURE
+    return ""
 
 
 def result_text(notation: str, rolls: Sequence[int], modifier: int = 0) -> str:
